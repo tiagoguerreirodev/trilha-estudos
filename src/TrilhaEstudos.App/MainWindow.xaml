@@ -2,14 +2,77 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="clr-namespace:TrilhaEstudos.App"
+ xmlns:core="clr-namespace:TrilhaEstudos.Core;assembly=TrilhaEstudos.Core"
  Title="Trilha Estudos" Icon="Assets/TrilhaEstudos.ico" Width="1320" Height="860" MinWidth="1024" MinHeight="720"
  WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
  <Window.Resources>
-  <HierarchicalDataTemplate DataType="{x:Type local:ContentNode}" ItemsSource="{Binding Children}">
-   <StackPanel Margin="3,5" MaxWidth="370">
-    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-    <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" FontSize="12" />
-   </StackPanel>
+  <Style x:Key="ContentTreeItem" TargetType="TreeViewItem">
+   <Setter Property="IsExpanded" Value="True" />
+   <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+   <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+   <Setter Property="Foreground" Value="#192F36" />
+   <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TreeViewItem">
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+     <ToggleButton x:Name="Expander" Width="16" Height="20" VerticalAlignment="Top" Margin="0,9,0,0" Focusable="False"
+      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" ClickMode="Press">
+      <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
+       <Border Background="Transparent"><Path x:Name="Arrow" Data="M 0,0 L 0,8 L 5,4 Z" HorizontalAlignment="Center" VerticalAlignment="Center"
+        Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" /></Border>
+       <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Data" Value="M 0,0 L 8,0 L 4,5 Z" /></Trigger></ControlTemplate.Triggers>
+      </ControlTemplate></ToggleButton.Template>
+     </ToggleButton>
+     <ContentPresenter x:Name="PART_Header" Grid.Column="1" ContentSource="Header" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+     <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Grid.Column="1" />
+    </Grid>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsExpanded" Value="False"><Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed" /></Trigger>
+     <Trigger Property="HasItems" Value="False"><Setter TargetName="Expander" Property="Visibility" Value="Hidden" /></Trigger>
+    </ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=TreeView}}" Value="True">
+     <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
+    </DataTrigger>
+    <MultiDataTrigger><MultiDataTrigger.Conditions>
+     <Condition Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=TreeView}}" Value="True" />
+     <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True" />
+    </MultiDataTrigger.Conditions><Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}" /></MultiDataTrigger>
+   </Style.Triggers>
+  </Style>
+  <Style x:Key="StatusHeaderCard" TargetType="Border">
+   <Setter Property="Margin" Value="0,3" /><Setter Property="Padding" Value="7,6" />
+   <Setter Property="CornerRadius" Value="6" /><Setter Property="BorderThickness" Value="2" />
+   <Setter Property="BorderBrush" Value="Transparent" /><Setter Property="Background" Value="Transparent" />
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding Status}" Value="{x:Static core:TopicStatus.Completed}"><Setter Property="Background" Value="#E6F4EA" /></DataTrigger>
+    <DataTrigger Binding="{Binding Status}" Value="{x:Static core:TopicStatus.InProgress}"><Setter Property="Background" Value="#E8F0FE" /></DataTrigger>
+    <DataTrigger Binding="{Binding Status}" Value="{x:Static core:TopicStatus.NotStarted}"><Setter Property="Background" Value="#FCE8E6" /></DataTrigger>
+    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True"><Setter Property="BorderBrush" Value="#075DA8" /></DataTrigger>
+    <DataTrigger Binding="{Binding IsKeyboardFocused, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True"><Setter Property="BorderBrush" Value="#075DA8" /></DataTrigger>
+    <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=TreeView}}" Value="True">
+     <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
+    </DataTrigger>
+    <MultiDataTrigger><MultiDataTrigger.Conditions>
+     <Condition Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=TreeView}}" Value="True" />
+     <Condition Binding="{Binding IsKeyboardFocused, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True" />
+    </MultiDataTrigger.Conditions><Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" /></MultiDataTrigger>
+    <MultiDataTrigger><MultiDataTrigger.Conditions>
+     <Condition Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=TreeView}}" Value="True" />
+     <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True" />
+    </MultiDataTrigger.Conditions>
+     <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+     <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}" />
+    </MultiDataTrigger>
+   </Style.Triggers>
+  </Style>
+  <HierarchicalDataTemplate DataType="{x:Type local:ContentNode}" ItemsSource="{Binding Children}" ItemContainerStyle="{StaticResource ContentTreeItem}">
+   <Border x:Name="StatusHeader" Style="{StaticResource StatusHeaderCard}"><StackPanel>
+    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" />
+    <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" />
+   </StackPanel></Border>
   </HierarchicalDataTemplate>
  </Window.Resources>
  <Grid>
@@ -118,8 +181,11 @@
       <Grid Grid.Row="1" Margin="0,8,0,0">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="270" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" MinWidth="300" /></Grid.ColumnDefinitions>
        <Border Style="{StaticResource Card}" Padding="8" Margin="0,0,0,0">
-        <TreeView ItemsSource="{Binding Tree}" SelectedItemChanged="OnTreeSelection" BorderThickness="0" Background="Transparent" AutomationProperties.Name="Editais, disciplinas e assuntos">
-         <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem"><Setter Property="IsExpanded" Value="True" /><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" /></Style></TreeView.ItemContainerStyle>
+        <TreeView ItemsSource="{Binding Tree}" SelectedItemChanged="OnTreeSelection" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+         Tag="{DynamicResource {x:Static SystemParameters.HighContrastKey}}" ItemContainerStyle="{StaticResource ContentTreeItem}" AutomationProperties.Name="Editais, disciplinas e assuntos">
+         <TreeView.Style><Style TargetType="TreeView"><Setter Property="Background" Value="Transparent" /><Style.Triggers>
+          <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True"><Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" /></DataTrigger>
+         </Style.Triggers></Style></TreeView.Style>
         </TreeView>
        </Border>
        <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch" Background="Transparent" />

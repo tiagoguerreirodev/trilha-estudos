@@ -9,6 +9,7 @@ Aplicativo nativo WPF para Windows 11 em português do Brasil. O conteúdo come�
 - Editais e planos com instituição/prova, data opcional e observações.
 - Disciplinas, assuntos e um nível de subassuntos, com edição, exclusão e reordenação entre irmãos.
 - Status, prioridade e observações. O percentual conta somente os itens finais. Grupos agregam o status dos filhos; alterar o status de um grupo aplica o novo status aos filhos.
+- Árvore de Editais e conteúdo com fundos por status: verde para concluído, azul para em andamento e vermelho para não iniciado. Disciplinas ficam verdes somente quando todos os seus itens finais estiverem concluídos; disciplinas vazias ou parciais e editais permanecem neutros.
 - Marcação de estudo anterior: conclui assuntos já estudados sem criar sessão, somar tempo ou iniciar revisões. A indicação histórica permanece disponível na árvore, nos detalhes e na busca.
 - Sessões manuais de estudo e revisão, com data, minutos e anotação, histórico, correção e exclusão.
 - Painel com progresso, tempo, atividades recentes e revisões de hoje/atrasadas. Busca sem distinção de acentos ou maiúsculas, com filtros combináveis.
@@ -72,7 +73,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish.ps1
 Para gerar outro pacote local, sem alterar a versão central nem publicar uma release:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -Version 1.0.3 -OutputDirectory artifacts\teste-1.0.3
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -Version 1.1.2 -OutputDirectory artifacts\teste-1.1.2
 ```
 
 O instalador é `artifacts\releases\TrilhaEstudos.App-win-x64-Setup.exe`. Distribua esse arquivo e execute-o normalmente no Windows 11 x64. A instalação é por usuário, sem administrador, inclui o runtime e cria atalhos e desinstalador. O destino padrão é `%LOCALAPPDATA%\TrilhaEstudos.App`; os estudos ficam separadamente em `%LOCALAPPDATA%\TrilhaEstudos`. Não exige .NET instalado no computador de destino. O pacote completo, o manifesto `releases.win-x64.json` e `SHA256SUMS.txt` servem à distribuição das atualizações.
@@ -131,6 +132,7 @@ Esse parâmetro troca somente a pasta do banco; não cria exemplos. Apenas uma i
 
 - Datas de sessões são datas locais, sem horário; não podem estar no futuro. Durações são minutos inteiros de 1 a 1440. A prova pode ter data passada. Nomes têm 1 a 200 caracteres após remover espaços; observações têm até 10.000.
 - Sessões não alteram o status automaticamente. O usuário controla o avanço manualmente.
+- Na árvore de **Editais e conteúdo**, a cor segue o status atual: verde claro para concluído, azul claro para em andamento e vermelho claro para não iniciado. O histórico de estudo anterior não prevalece sobre esse status. Grupos usam seu status agregado; os filhos mantêm suas próprias cores. Disciplinas com conteúdo ficam verdes quando todas as folhas estiverem concluídas e voltam ao fundo neutro se houver nova pendência. A seleção usa contorno azul-escuro, mantendo o fundo de status; o alto contraste usa as cores do Windows. Os textos continuam identificando os estados.
 - **Marcar como já estudado**, disponível nos detalhes do conteúdo e na busca, conclui o assunto e registra a indicação **Estudado anteriormente**. Não solicita data ou duração e não cria sessões nem altera revisões. O tempo continua sendo calculado exclusivamente pelas sessões reais.
 - Em grupos, marcar ou remover a marcação pede confirmação com a quantidade de subassuntos afetados. A ação inclui o grupo e todos os filhos existentes; novos filhos começam sem marcação. O grupo mostra nenhum, alguns ou todos os filhos marcados.
 - **Remover marcação de estudo anterior** retira somente a indicação histórica e mantém o status atual. Para alterar a conclusão, use **Editar**. Editar nome, prioridade, observações ou status preserva a marcação histórica; não é preciso registrar uma sessão para concluir um assunto.
@@ -162,6 +164,7 @@ Use um banco isolado pelo parâmetro acima, se desejar. Os exemplos abaixo são 
 8. **Persistência e interface:** fechar e reabrir. Conferir editais, ordem, status, notas, sessões, intervalos e revisões. Redimensionar, testar Tab/Shift+Tab/Enter/Esc e escala do Windows em 150%/200%; conferir rolagem e acesso aos botões.
 9. **Atualizações:** conferir versão nas Configurações; consultar sem conexão e continuar estudando. Com uma release superior, conferir notas, cancelar download e baixar novamente. Instalar somente ao confirmar, conferir backup, versão nova e os mesmos estudos após reiniciar. Pacotes locais de teste 1.0.0 → 1.0.1 devem usar um identificador e banco exclusivos; não publique a versão de teste no GitHub.
 10. **Estudo anterior:** marcar um assunto nos detalhes e outro pela busca. Conferir conclusão, indicação textual e tempo inalterado, sem novas sessões ou revisões. Em um grupo, cancelar a confirmação e conferir que nada mudou; depois confirmar e verificar os filhos. Remover a marcação, confirmar que os status permanecem e cadastrar um novo subassunto sem marcação. Fechar e reabrir para verificar persistência. Na atualização 1.0.2 → 1.1.0, conferir a criação do backup da migração e a preservação dos registros anteriores.
+11. **Cores da árvore:** conferir os três status, grupos mistos e disciplina vazia. Concluir a última pendência de uma disciplina e conferir fundo verde; adicionar ou reabrir conteúdo e conferir retorno ao neutro. Remover apenas a marca histórica não deve mudar o verde de itens concluídos. Selecionar, navegar pelo teclado, expandir/recolher, reordenar e redimensionar com nomes longos, conferindo contorno, cores, quebra de linhas e rolagem. Em alto contraste do Windows, conferir legibilidade e seleção com as cores do sistema. A versão 1.1.1 não altera o esquema do banco.
 
 ## Estrutura e verificações automatizadas
 

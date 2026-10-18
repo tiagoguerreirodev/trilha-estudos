@@ -200,12 +200,17 @@ public sealed class MainViewModel : Observable
     }
     private ContentNode TopicNode(Topic t) => new()
     {
-        Id = t.Id, Kind = EntityKind.Topic, Name = t.Name,
+        Id = t.Id, Kind = EntityKind.Topic, Name = t.Name, Status = t.Status,
         Detail = $"{t.Status.Text()} • {t.Priority.Text()}" + (_snapshot.IsGroup(t) ? " • Grupo" : "")
             + (t.PreviouslyStudied || _snapshot.IsGroup(t) ? "\n" + _snapshot.PreviousStudyLabel(t) : ""),
         Children = _snapshot.Topics.Where(x => x.ParentId == t.Id).Select(TopicNode).ToList(),
         IsSelected = _selectedNode?.Kind == EntityKind.Topic && _selectedNode.Id == t.Id
     };
+    private bool DisciplineCompleted(int id)
+    {
+        var leaves = _snapshot.Topics.Where(t => t.DisciplineId == id && !_snapshot.IsGroup(t)).ToArray();
+        return leaves.Length > 0 && leaves.All(t => t.Status == TopicStatus.Completed);
+    }
     private void RefreshViews()
     {
         _refreshing = true;
@@ -219,7 +224,9 @@ public sealed class MainViewModel : Observable
             IsSelected = _selectedNode?.Kind == EntityKind.Plan && _selectedNode.Id == p.Id,
             Children = _snapshot.Disciplines.Where(d => d.PlanId == p.Id).Select(d => new ContentNode
             {
-                Id = d.Id, Kind = EntityKind.Discipline, Name = d.Name, Detail = "Disciplina",
+                Id = d.Id, Kind = EntityKind.Discipline, Name = d.Name,
+                Detail = DisciplineCompleted(d.Id) ? "Disciplina • Todos os itens concluídos" : "Disciplina",
+                Status = DisciplineCompleted(d.Id) ? TopicStatus.Completed : null,
                 IsSelected = _selectedNode?.Kind == EntityKind.Discipline && _selectedNode.Id == d.Id,
                 Children = _snapshot.Topics.Where(t => t.DisciplineId == d.Id && t.ParentId == null).Select(TopicNode).ToList()
             }).ToList()

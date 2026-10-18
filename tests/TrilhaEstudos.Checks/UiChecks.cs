@@ -85,6 +85,7 @@ internal static class UiChecks
                     await Render(window, Path.Combine(outputDirectory, "08-busca-tamanho-minimo.png"));
                     vm.PageIndex = 1;
                     await Render(window, Path.Combine(outputDirectory, "09-conteudo-tamanho-minimo.png"));
+                    await CheckTreeColors(window, vm, store, p, d, group, t, outputDirectory);
                     var draft = new EditorViewModel().Text("name", "Nome do assunto *", "")
                         .Choice("status", "Status", [new(0, "Não iniciado"), new(1, "Em andamento"), new(2, "Concluído")], 0)
                         .Date("date", "Data (opcional)", today).Text("notes", "Observações (opcional)", "", true);
@@ -112,6 +113,77 @@ internal static class UiChecks
         return completion.Task.WaitAsync(TimeSpan.FromSeconds(60));
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static async Task CheckTreeColors(Window window, MainViewModel vm, StudyStore store,
+        int plan, int discipline, int group, int topic, string output)
+    {
+        vm.PageIndex = 1;
+        async Task Refresh()
+        {
+            await vm.InitializeAsync(); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
+            Require(vm.Error.Length == 0, vm.Error);
+        }
+        ContentNode Node(int id, EntityKind kind) => Descendants(window).OfType<Border>()
+            .Where(b => b.Name == "StatusHeader").Select(b => b.DataContext).OfType<ContentNode>().First(n => n.Id == id && n.Kind == kind);
+        Border Header(int id, EntityKind kind = EntityKind.Topic) => Descendants(window).OfType<Border>()
+            .Single(b => b.Name == "StatusHeader" && b.DataContext is ContentNode n && n.Id == id && n.Kind == kind);
+        void ColorIs(int id, EntityKind kind, string color)
+            => Require(((SolidColorBrush)Header(id, kind).Background).Color == (Color)ColorConverter.ConvertFromString(color), $"Cor incorreta em {kind}/{id}.");
+        void Neutral(int id, EntityKind kind)
+            => Require(((SolidColorBrush)Header(id, kind).Background).Color.A == 0, $"Item {kind}/{id} deveria ser neutro.");
+        await Refresh();
+        ColorIs(discipline, EntityKind.Discipline, "#E6F4EA"); Neutral(plan, EntityKind.Plan);
+        await store.SetPreviouslyStudiedAsync(group, false); await Refresh();
+        ColorIs(discipline, EntityKind.Discipline, "#E6F4EA");
+        var s = await store.ReadAsync(); var t = s.Topics.Single(x => x.Id == topic);
+        await store.SaveTopicAsync(t.Id, t.DisciplineId, t.ParentId, t.Name, TopicStatus.InProgress, t.Priority, t.Notes); await Refresh();
+        Require((await store.ReadAsync()).Topics.Single(x => x.Id == topic).PreviouslyStudied, "Histórico foi perdido ao reabrir assunto.");
+        ColorIs(topic, EntityKind.Topic, "#E8F0FE"); Neutral(discipline, EntityKind.Discipline);
+        var added = await store.SaveTopicAsync(null, discipline, group,
+            "Um subassunto com nome longo para conferir a quebra de linhas e a legibilidade do status na árvore em uma janela menor",
+            TopicStatus.NotStarted, Priority.Medium, "Teste isolado da interface.");
+        var empty = await store.SaveDisciplineAsync(null, plan, "Disciplina vazia");
+        var completed = await store.SaveDisciplineAsync(null, plan, "Disciplina totalmente estudada");
+        await store.SaveTopicAsync(null, completed, null, "Conteúdo concluído", TopicStatus.Completed, Priority.Medium, "");
+        await Refresh();
+        ColorIs(added, EntityKind.Topic, "#FCE8E6"); ColorIs(group, EntityKind.Topic, "#E8F0FE");
+        var greenChild = (await store.ReadAsync()).Topics.First(x => x.ParentId == group && x.Id != added).Id;
+        ColorIs(greenChild, EntityKind.Topic, "#E6F4EA");
+        Neutral(empty, EntityKind.Discipline); ColorIs(completed, EntityKind.Discipline, "#E6F4EA");
+        vm.SelectedNode = Node(topic, EntityKind.Topic); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        ColorIs(topic, EntityKind.Topic, "#E8F0FE");
+        Require(((SolidColorBrush)Header(topic).BorderBrush).Color == (Color)ColorConverter.ConvertFromString("#075DA8")
+            && Header(topic).BorderThickness == new Thickness(2), "Seleção apagou cor ou contorno.");
+        var groupContainer = Descendants(window).OfType<TreeViewItem>().Single(x => x.DataContext is ContentNode n && n.Kind == EntityKind.Topic && n.Id == group);
+        groupContainer.IsExpanded = false; await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Require(Descendants(groupContainer).OfType<ItemsPresenter>().First().Visibility == Visibility.Collapsed, "Recolher grupo deixou filhos visíveis.");
+        groupContainer.IsExpanded = true; await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Require(Descendants(groupContainer).OfType<ItemsPresenter>().First().Visibility == Visibility.Visible, "Expandir grupo não restaurou filhos.");
+        await Execute(vm.MoveUpCommand, vm);
+        ColorIs(topic, EntityKind.Topic, "#E8F0FE");
+        window.Width = 1320; window.Height = 960;
+        await Render(window, Path.Combine(output, "11-cores-status.png"));
+        window.Width = 1024; window.Height = 720;
+        await Render(window, Path.Combine(output, "12-cores-tamanho-minimo.png"));
+        // Substitui somente recursos desta janela; não altera a acessibilidade do Windows.
+        window.Resources[SystemParameters.HighContrastKey] = true;
+        window.Resources[SystemColors.WindowBrushKey] = Brushes.Black;
+        window.Resources[SystemColors.WindowTextBrushKey] = Brushes.White;
+        window.Resources[SystemColors.HighlightBrushKey] = Brushes.Yellow;
+        window.Resources[SystemColors.HighlightTextBrushKey] = Brushes.Black;
+        await Render(window, Path.Combine(output, "13-alto-contraste-simulado.png"));
+        ColorIs(topic, EntityKind.Topic, "#FFFFFF00"); ColorIs(added, EntityKind.Topic, "#FF000000");
+        var container = Descendants(window).OfType<TreeViewItem>().Single(x => x.DataContext is ContentNode n && n.Kind == EntityKind.Topic && n.Id == topic);
+        Require(((SolidColorBrush)container.Foreground).Color == Colors.Black, "Seleção em alto contraste ilegível.");
+        foreach (var key in new object[] { SystemParameters.HighContrastKey, SystemColors.WindowBrushKey, SystemColors.WindowTextBrushKey, SystemColors.HighlightBrushKey, SystemColors.HighlightTextBrushKey }) window.Resources.Remove(key);
+        await Refresh(); ColorIs(topic, EntityKind.Topic, "#E8F0FE");
+        await store.SaveTopicAsync(t.Id, t.DisciplineId, t.ParentId, t.Name, TopicStatus.Completed, t.Priority, t.Notes); await Refresh();
+        Neutral(discipline, EntityKind.Discipline);
+        await store.DeleteAsync(EntityKind.Topic, added); await Refresh();
+        ColorIs(discipline, EntityKind.Discipline, "#E6F4EA");
+        await store.SaveTopicAsync(null, discipline, null, "Nova pendência", TopicStatus.NotStarted, Priority.Low, ""); await Refresh();
+        Neutral(discipline, EntityKind.Discipline);
+        Require(vm.Summary.Minutes == 45 && vm.SessionRows.Count == 1 && vm.ReviewRows.Count == 1, "Mudança visual alterou estudos.");
+    }
     private static async Task Execute(ICommand command, MainViewModel vm)
     {
         Require(command.CanExecute(null), $"Comando de estudo anterior desabilitado: página={vm.PageIndex}, seleção={vm.SelectedNode?.Kind}/{vm.SelectedNode?.Id}, ocupado={vm.IsBusy}, erro={vm.Error}."); command.Execute(null);

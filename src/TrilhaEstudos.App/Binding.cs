@@ -39,6 +39,7 @@ public sealed class ContentNode : Observable
     public required Core.EntityKind Kind { get; init; }
     public required string Name { get; init; }
     public string Detail { get; init; } = "";
+    public Core.TopicStatus? Status { get; init; }
     public List<ContentNode> Children { get; init; } = [];
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
