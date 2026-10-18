@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TrilhaEstudos</AssemblyName>
+    <RootNamespace>TrilhaEstudos.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\TrilhaEstudos.ico</ApplicationIcon>
+    <StartupObject>TrilhaEstudos.App.App</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TrilhaEstudos.Checks" />
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+    <AssemblyMetadata Include="UpdateRepositoryUrl" Value="$(RepositoryUrl)" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <ProjectReference Include="..\TrilhaEstudos.Core\TrilhaEstudos.Core.csproj" />
+    <Resource Include="Assets\TrilhaEstudos.ico" />
+    <Resource Include="Assets\TrilhaEstudos.logo.png" />
+  </ItemGroup>
+</Project>

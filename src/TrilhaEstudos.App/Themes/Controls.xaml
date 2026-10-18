@@ -1,0 +1,70 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <SolidColorBrush x:Key="Accent" Color="#216A62" />
+  <SolidColorBrush x:Key="Muted" Color="#586A70" />
+  <BooleanToVisibilityConverter x:Key="BoolVisibility" />
+  <Style TargetType="Window">
+   <Setter Property="FontFamily" Value="Segoe UI" /><Setter Property="FontSize" Value="14" />
+   <Setter Property="Background" Value="#F3F6F7" /><Setter Property="Foreground" Value="#192F36" />
+  </Style>
+  <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap" /></Style>
+  <Style x:Key="Heading" TargetType="TextBlock">
+   <Setter Property="FontSize" Value="26" /><Setter Property="FontWeight" Value="SemiBold" />
+   <Setter Property="Margin" Value="0,0,0,16" />
+  </Style>
+  <Style x:Key="Section" TargetType="TextBlock">
+   <Setter Property="FontSize" Value="19" /><Setter Property="FontWeight" Value="SemiBold" />
+   <Setter Property="Margin" Value="0,12,0,12" />
+  </Style>
+  <Style x:Key="Hint" TargetType="TextBlock">
+   <Setter Property="Foreground" Value="{StaticResource Muted}" /><Setter Property="Margin" Value="0,4,0,12" />
+   <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style TargetType="Button">
+   <Setter Property="Padding" Value="13,8" /><Setter Property="Margin" Value="0,0,8,8" />
+   <Setter Property="Background" Value="White" /><Setter Property="Foreground" Value="#192F36" />
+   <Setter Property="BorderBrush" Value="#CFDADD" /><Setter Property="BorderThickness" Value="1" />
+   <Setter Property="Cursor" Value="Hand" /><Setter Property="MinHeight" Value="36" />
+   <Setter Property="Template">
+    <Setter.Value><ControlTemplate TargetType="Button">
+     <Border x:Name="Chrome" CornerRadius="6" Background="{TemplateBinding Background}"
+      BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+      <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+     </Border>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Opacity" Value="0.82" /></Trigger>
+      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Opacity" Value="0.65" /></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#075DA8" /><Setter TargetName="Chrome" Property="BorderThickness" Value="2" /></Trigger>
+      <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.45" /></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value>
+   </Setter>
+  </Style>
+  <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+   <Setter Property="Background" Value="{StaticResource Accent}" /><Setter Property="Foreground" Value="White" />
+   <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+  </Style>
+  <Style x:Key="Danger" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+   <Setter Property="Foreground" Value="#A52929" />
+  </Style>
+  <Style TargetType="TextBox"><Setter Property="Padding" Value="9,7" /><Setter Property="MinHeight" Value="36" />
+   <Setter Property="BorderBrush" Value="#B9CACE" /><Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style TargetType="ComboBox"><Setter Property="Padding" Value="8,6" /><Setter Property="MinHeight" Value="36" />
+   <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style TargetType="DatePicker"><Setter Property="MinHeight" Value="36" /></Style>
+  <Style x:Key="Card" TargetType="Border">
+   <Setter Property="Background" Value="White" /><Setter Property="CornerRadius" Value="10" />
+   <Setter Property="BorderBrush" Value="#DCE5E7" /><Setter Property="BorderThickness" Value="1" />
+   <Setter Property="Padding" Value="20" /><Setter Property="Margin" Value="0,0,12,12" />
+  </Style>
+  <Style TargetType="DataGrid">
+   <Setter Property="AutoGenerateColumns" Value="False" /><Setter Property="IsReadOnly" Value="True" />
+   <Setter Property="CanUserAddRows" Value="False" /><Setter Property="CanUserDeleteRows" Value="False" />
+   <Setter Property="SelectionMode" Value="Single" /><Setter Property="SelectionUnit" Value="FullRow" />
+   <Setter Property="HeadersVisibility" Value="Column" /><Setter Property="GridLinesVisibility" Value="Horizontal" />
+   <Setter Property="HorizontalGridLinesBrush" Value="#E6EDEE" /><Setter Property="RowHeaderWidth" Value="0" />
+   <Setter Property="RowHeight" Value="40" /><Setter Property="ColumnHeaderHeight" Value="36" />
+   <Setter Property="BorderBrush" Value="#DCE5E7" /><Setter Property="Background" Value="White" />
+  </Style>
+ </ResourceDictionary>

@@ -1,0 +1,44 @@
+name: Publicar release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão estável MAJOR.MINOR.PATCH (primeira publicação: 1.0.0)'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: publicar-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REQUESTED_VERSION: ${{ inputs.version }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Preparar a versão
+        shell: pwsh
+        run: ./scripts/release.ps1 -Stage Prepare -RequestedVersion $env:REQUESTED_VERSION -Repository $env:GITHUB_REPOSITORY
+      - name: Compilar e verificar
+        shell: pwsh
+        run: ./scripts/build.ps1
+      - name: Gerar instalador e pacotes
+        shell: pwsh
+        run: ./scripts/publish.ps1 -Version $env:RELEASE_VERSION -RepositoryUrl "https://github.com/$env:GITHUB_REPOSITORY" -ReleaseNotes artifacts/release-notes.md
+      - name: Publicar release completa
+        shell: pwsh
+        run: ./scripts/release.ps1 -Stage Publish -RequestedVersion $env:RELEASE_VERSION -Repository $env:GITHUB_REPOSITORY

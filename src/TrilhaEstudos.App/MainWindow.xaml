@@ -1,0 +1,254 @@
+<Window x:Class="TrilhaEstudos.App.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:TrilhaEstudos.App"
+ Title="Trilha Estudos" Icon="Assets/TrilhaEstudos.ico" Width="1320" Height="860" MinWidth="1024" MinHeight="720"
+ WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
+ <Window.Resources>
+  <HierarchicalDataTemplate DataType="{x:Type local:ContentNode}" ItemsSource="{Binding Children}">
+   <StackPanel Margin="3,5" MaxWidth="370">
+    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+    <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" FontSize="12" />
+   </StackPanel>
+  </HierarchicalDataTemplate>
+ </Window.Resources>
+ <Grid>
+  <Grid.ColumnDefinitions><ColumnDefinition Width="200" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+  <Border Background="#183D42" Padding="18,26,14,16">
+   <DockPanel>
+    <Grid DockPanel.Dock="Top" Margin="0,0,0,28">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="48" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+     <Image Source="Assets/TrilhaEstudos.logo.png" Width="40" Height="40" HorizontalAlignment="Left"
+      VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Logotipo Trilha Estudos" />
+     <StackPanel Grid.Column="1" VerticalAlignment="Center">
+      <TextBlock Text="TRILHA" FontSize="21" FontWeight="Bold" Foreground="White" />
+      <TextBlock Text="ESTUDOS" FontSize="11" Foreground="#BAD9D6" Margin="1,1,0,0" />
+     </StackPanel>
+    </Grid>
+    <TextBlock DockPanel.Dock="Bottom" Text="Seu conteúdo.&#10;Seu ritmo.&#10;Neste computador." Foreground="#C4DDDC" FontSize="12" Margin="5,20,0,0" />
+    <ListBox SelectedIndex="{Binding PageIndex}" BorderThickness="0" Background="Transparent" Foreground="White" VerticalAlignment="Top">
+     <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem">
+      <Setter Property="Padding" Value="12,13" /><Setter Property="Margin" Value="0,0,0,5" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+       <Border x:Name="Nav" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter /></Border>
+       <ControlTemplate.Triggers>
+        <Trigger Property="IsSelected" Value="True"><Setter TargetName="Nav" Property="Background" Value="#31616A" /></Trigger>
+        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Nav" Property="BorderBrush" Value="#92C8C3" /><Setter TargetName="Nav" Property="BorderThickness" Value="1" /></Trigger>
+        <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Nav" Property="BorderBrush" Value="White" /><Setter TargetName="Nav" Property="BorderThickness" Value="2" /></Trigger>
+       </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+     </Style></ListBox.ItemContainerStyle>
+     <ListBoxItem Content="Painel" /><ListBoxItem Content="Editais e conteúdo" /><ListBoxItem Content="Buscar assuntos" />
+     <ListBoxItem Content="Histórico" /><ListBoxItem Content="Revisões" /><ListBoxItem Content="Configurações" />
+    </ListBox>
+   </DockPanel>
+  </Border>
+  <DockPanel Grid.Column="1" Margin="28,24,16,12">
+   <StackPanel DockPanel.Dock="Top">
+    <Grid Margin="0,0,12,18">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="260" /></Grid.ColumnDefinitions>
+     <StackPanel><TextBlock Text="{Binding PageTitle}" Style="{StaticResource Heading}" Margin="0,0,0,3" />
+      <TextBlock Text="Organize o que você quer aprender, um assunto de cada vez." Foreground="{StaticResource Muted}" />
+     </StackPanel>
+     <StackPanel Grid.Column="1" Margin="18,0,0,0">
+      <TextBlock Text="Visão do edital" Margin="0,0,0,4" />
+      <ComboBox ItemsSource="{Binding PlanChoices}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedPlan}" AutomationProperties.Name="Visão do edital" />
+     </StackPanel>
+    </Grid>
+    <TextBlock Text="{Binding Error}" Foreground="#A52929" Margin="0,0,12,8" AutomationProperties.LiveSetting="Polite" />
+    <Border Background="#E3F1ED" CornerRadius="6" Padding="12,8" Margin="0,0,12,10"
+     Visibility="{Binding Updates.HasUpdate, Converter={StaticResource BoolVisibility}}">
+     <DockPanel><Button DockPanel.Dock="Right" Content="Ver atualização" Command="{Binding ShowUpdatesCommand}" Margin="12,0,0,0" />
+      <TextBlock Text="{Binding Updates.AvailableVersion}" VerticalAlignment="Center" FontWeight="SemiBold" /></DockPanel>
+    </Border>
+    <Button Content="Tentar abrir os dados novamente" Command="{Binding RetryCommand}" HorizontalAlignment="Left"
+     Visibility="{Binding NeedsInitialization, Converter={StaticResource BoolVisibility}}" />
+   </StackPanel>
+   <TextBlock DockPanel.Dock="Bottom" Text="{Binding WorkStatus}" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,10,0,0" />
+   <TabControl SelectedIndex="{Binding PageIndex}" BorderThickness="0" Background="Transparent">
+    <TabControl.Template><ControlTemplate TargetType="TabControl"><ContentPresenter ContentSource="SelectedContent" /></ControlTemplate></TabControl.Template>
+    <TabItem>
+     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+       <Border Style="{StaticResource Card}" Visibility="{Binding Empty, Converter={StaticResource BoolVisibility}}" Background="#E3F1ED">
+        <StackPanel>
+         <TextBlock Text="Seu primeiro passo começa aqui" FontSize="23" FontWeight="SemiBold" />
+         <TextBlock Text="Crie seu edital, adicione disciplinas e cadastre os assuntos. Você escolhe todo o conteúdo; o Trilha acompanha seu progresso e suas revisões." Style="{StaticResource Hint}" Margin="0,10,0,16" />
+         <Button Content="Criar meu primeiro edital" Command="{Binding NewPlanCommand}" Style="{StaticResource Primary}" HorizontalAlignment="Left" />
+        </StackPanel>
+       </Border>
+       <UniformGrid Columns="3">
+        <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Não iniciados" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding Summary.NotStarted}" FontSize="32" FontWeight="SemiBold" /></StackPanel></Border>
+        <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Em andamento" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding Summary.InProgress}" FontSize="32" FontWeight="SemiBold" /></StackPanel></Border>
+        <Border Style="{StaticResource Card}"><StackPanel><TextBlock Text="Concluídos" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding Summary.Completed}" FontSize="32" FontWeight="SemiBold" /></StackPanel></Border>
+       </UniformGrid>
+       <Border Style="{StaticResource Card}">
+        <StackPanel>
+         <TextBlock Text="{Binding PercentText}" FontSize="22" FontWeight="SemiBold" />
+         <ProgressBar Value="{Binding Summary.Percent, Mode=OneWay}" Minimum="0" Maximum="100" Height="8" Margin="0,12,0,10" Foreground="{StaticResource Accent}" AutomationProperties.Name="Percentual de assuntos concluídos" />
+         <TextBlock Text="{Binding TimeText, StringFormat=Tempo estudado: {0}}" />
+         <TextBlock Text="O percentual considera assuntos sem subassuntos e os subassuntos finais, com o mesmo peso." Style="{StaticResource Hint}" />
+         <WrapPanel><Button Content="Localizar pendentes" Command="{Binding PendingCommand}" /><Button Content="Registrar estudo" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" /></WrapPanel>
+        </StackPanel>
+       </Border>
+       <Border Style="{StaticResource Card}"><StackPanel>
+        <TextBlock Text="Revisões para agora" Style="{StaticResource Section}" Margin="0,0,0,8" />
+        <TextBlock Text="{Binding UrgentHint}" Style="{StaticResource Hint}" />
+        <ItemsControl ItemsSource="{Binding UrgentReviews}"><ItemsControl.ItemTemplate><DataTemplate>
+         <StackPanel Margin="0,5"><TextBlock Text="{Binding Path}" FontWeight="SemiBold" /><TextBlock Foreground="{StaticResource Muted}"><Run Text="{Binding Date}" /><Run Text=" • " /><Run Text="{Binding State}" /></TextBlock></StackPanel>
+        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+       </StackPanel></Border>
+       <Border Style="{StaticResource Card}"><StackPanel>
+        <TextBlock Text="Atividades recentes" Style="{StaticResource Section}" Margin="0,0,0,8" />
+        <ItemsControl ItemsSource="{Binding RecentActivities}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Margin="0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+       </StackPanel></Border>
+      </StackPanel>
+     </ScrollViewer>
+    </TabItem>
+    <TabItem>
+     <Grid>
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+      <WrapPanel>
+       <Button Content="Novo edital" Command="{Binding NewPlanCommand}" Style="{StaticResource Primary}" />
+       <Button Content="Nova disciplina" Command="{Binding NewDisciplineCommand}" />
+       <Button Content="Novo assunto" Command="{Binding NewTopicCommand}" />
+       <Button Content="Novo subassunto" Command="{Binding NewSubtopicCommand}" />
+      </WrapPanel>
+      <Grid Grid.Row="1" Margin="0,8,0,0">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="270" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" MinWidth="300" /></Grid.ColumnDefinitions>
+       <Border Style="{StaticResource Card}" Padding="8" Margin="0,0,0,0">
+        <TreeView ItemsSource="{Binding Tree}" SelectedItemChanged="OnTreeSelection" BorderThickness="0" Background="Transparent" AutomationProperties.Name="Editais, disciplinas e assuntos">
+         <TreeView.ItemContainerStyle><Style TargetType="TreeViewItem"><Setter Property="IsExpanded" Value="True" /><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" /></Style></TreeView.ItemContainerStyle>
+        </TreeView>
+       </Border>
+       <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch" Background="Transparent" />
+       <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Margin="12,0,0,0">
+        <StackPanel>
+         <Border Style="{StaticResource Card}" Margin="0,0,12,12"><StackPanel>
+          <TextBlock Text="{Binding SelectionTitle}" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12" />
+          <TextBlock Text="{Binding SelectionDetails}" />
+          <WrapPanel Margin="0,18,0,0">
+           <Button Content="Editar" Command="{Binding EditContentCommand}" />
+           <Button Content="Excluir" Command="{Binding DeleteContentCommand}" Style="{StaticResource Danger}" />
+           <Button Content="Mover para cima" Command="{Binding MoveUpCommand}" />
+           <Button Content="Mover para baixo" Command="{Binding MoveDownCommand}" />
+          </WrapPanel>
+          <WrapPanel Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}">
+           <Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" />
+           <Button Content="Iniciar novo ciclo" Command="{Binding RestartCycleCommand}" ToolTip="Disponível quando não há ciclo pendente. Inicia a partir de hoje." />
+          </WrapPanel>
+         </StackPanel></Border>
+         <Border Style="{StaticResource Card}" Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}"><StackPanel>
+          <TextBlock Text="Sessões recentes" Style="{StaticResource Section}" Margin="0,0,0,8" />
+          <TextBlock Text="{Binding SelectionHistoryHint}" Style="{StaticResource Hint}" />
+          <ItemsControl ItemsSource="{Binding SelectionSessions}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,5">
+           <TextBlock><Run Text="{Binding Date}" /><Run Text=" • " /><Run Text="{Binding Kind}" /><Run Text=" • " /><Run Text="{Binding Duration}" /></TextBlock>
+           <TextBlock Text="{Binding Notes}" Foreground="{StaticResource Muted}" />
+          </StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+         </StackPanel></Border>
+        </StackPanel>
+       </ScrollViewer>
+      </Grid>
+     </Grid>
+    </TabItem>
+    <TabItem>
+     <Grid Margin="0,0,12,0">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+      <StackPanel>
+       <TextBlock Text="Busca por nome, caminho ou observações" Margin="0,0,0,5" />
+       <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Busca de assuntos" />
+       <WrapPanel Margin="0,10,0,0">
+        <ComboBox Width="200" Margin="0,0,8,8" ItemsSource="{Binding DisciplineChoices}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedDiscipline}" AutomationProperties.Name="Filtrar disciplina" />
+        <ComboBox Width="165" Margin="0,0,8,8" ItemsSource="{Binding StatusChoices}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedStatus}" AutomationProperties.Name="Filtrar status" />
+        <ComboBox Width="175" Margin="0,0,8,8" ItemsSource="{Binding PriorityChoices}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedPriority}" AutomationProperties.Name="Filtrar prioridade" />
+        <CheckBox Content="Somente pendentes" IsChecked="{Binding PendingOnly}" VerticalAlignment="Center" Margin="0,0,8,8" />
+       </WrapPanel>
+      </StackPanel>
+      <StackPanel Grid.Row="1">
+       <WrapPanel><Button Content="Limpar filtros" Command="{Binding ClearFiltersCommand}" /><Button Content="Abrir assunto" Command="{Binding OpenTopicCommand}" /><Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" /></WrapPanel>
+       <TextBlock Text="{Binding ResultHint}" Style="{StaticResource Hint}" />
+      </StackPanel>
+      <DataGrid Grid.Row="2" ItemsSource="{Binding TopicRows}" SelectedItem="{Binding SelectedTopicRow}" RowHeight="58" AutomationProperties.Name="Resultados da busca">
+       <DataGrid.Columns>
+        <DataGridTemplateColumn Header="Assunto e caminho" Width="*" MinWidth="240">
+         <DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Margin="6,5" ToolTip="{Binding Path}">
+          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding Path}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+         </StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate>
+        </DataGridTemplateColumn>
+        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="125" />
+        <DataGridTextColumn Header="Prioridade" Binding="{Binding Priority}" Width="90" />
+        <DataGridTextColumn Header="Tempo" Binding="{Binding Time}" Width="105" />
+        <DataGridTextColumn Header="Tipo" Binding="{Binding Group}" Width="85" />
+       </DataGrid.Columns>
+      </DataGrid>
+     </Grid>
+    </TabItem>
+    <TabItem>
+     <Grid Margin="0,0,12,0">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+      <TextBlock Text="Todas as sessões do edital selecionado. As correções atualizam os totais e as revisões vinculadas." Style="{StaticResource Hint}" />
+      <WrapPanel Grid.Row="1"><Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" /><Button Content="Editar sessão" Command="{Binding EditSessionCommand}" /><Button Content="Excluir sessão" Command="{Binding DeleteSessionCommand}" Style="{StaticResource Danger}" /></WrapPanel>
+      <DataGrid Grid.Row="2" ItemsSource="{Binding SessionRows}" SelectedItem="{Binding SelectedSession}" RowDetailsVisibilityMode="VisibleWhenSelected" AutomationProperties.Name="Histórico de sessões">
+       <DataGrid.RowDetailsTemplate><DataTemplate><TextBlock Text="{Binding Notes}" Margin="16,8" TextWrapping="Wrap" MaxWidth="700" /></DataTemplate></DataGrid.RowDetailsTemplate>
+       <DataGrid.Columns>
+        <DataGridTextColumn Header="Data" Binding="{Binding Date}" Width="110" />
+        <DataGridTextColumn Header="Tipo" Binding="{Binding Kind}" Width="85" />
+        <DataGridTextColumn Header="Assunto" Binding="{Binding Path}" Width="*" MinWidth="240" />
+        <DataGridTextColumn Header="Duração" Binding="{Binding Duration}" Width="115" />
+       </DataGrid.Columns>
+      </DataGrid>
+     </Grid>
+    </TabItem>
+    <TabItem>
+     <Grid Margin="0,0,12,0">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+      <TextBlock Text="{Binding ReviewHint}" Style="{StaticResource Hint}" />
+      <WrapPanel Grid.Row="1"><Button Content="Registrar revisão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" /><Button Content="Abrir assunto" Command="{Binding OpenTopicCommand}" /></WrapPanel>
+      <DataGrid Grid.Row="2" ItemsSource="{Binding ReviewRows}" SelectedItem="{Binding SelectedReview}" AutomationProperties.Name="Revisões pendentes">
+       <DataGrid.Columns>
+        <DataGridTextColumn Header="Situação" Binding="{Binding State}" Width="100" />
+        <DataGridTextColumn Header="Próxima data" Binding="{Binding Date}" Width="115" />
+        <DataGridTextColumn Header="Assunto" Binding="{Binding Path}" Width="*" MinWidth="240" />
+        <DataGridTextColumn Header="Etapa" Binding="{Binding Step}" Width="80" />
+       </DataGrid.Columns>
+      </DataGrid>
+     </Grid>
+    </TabItem>
+    <TabItem>
+     <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+      <Border Style="{StaticResource Card}"><StackPanel>
+       <TextBlock Text="Trilha Estudos" Style="{StaticResource Section}" Margin="0,0,0,8" />
+       <TextBlock Text="{Binding Updates.VersionText}" FontSize="24" FontWeight="SemiBold" />
+       <TextBlock Text="{Binding Updates.Status}" Style="{StaticResource Hint}" Margin="0,12,0,12" AutomationProperties.LiveSetting="Polite" />
+       <TextBlock Text="{Binding Updates.AvailableVersion}" FontWeight="SemiBold" />
+       <TextBlock Text="{Binding Updates.ReleaseNotes}" Margin="0,6,0,12" TextWrapping="Wrap" />
+       <ProgressBar Minimum="0" Maximum="100" Value="{Binding Updates.Progress, Mode=OneWay}" Height="8" Margin="0,0,0,12"
+        Visibility="{Binding Updates.IsDownloading, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="Progresso do download" />
+       <WrapPanel>
+        <Button Content="Verificar atualizações" Command="{Binding Updates.CheckCommand}" />
+        <Button Content="Baixar atualização" Command="{Binding Updates.DownloadCommand}" />
+        <Button Content="Cancelar download" Command="{Binding Updates.CancelCommand}" />
+        <Button Content="Reiniciar e instalar" Command="{Binding Updates.ApplyCommand}" Style="{StaticResource Primary}" />
+       </WrapPanel>
+       <TextBlock Text="A consulta usa o GitHub. Sem internet, você pode continuar estudando normalmente. A instalação depende da sua confirmação." Style="{StaticResource Hint}" />
+      </StackPanel></Border>
+      <Border Style="{StaticResource Card}"><StackPanel>
+       <TextBlock Text="Revisões no seu ritmo" Style="{StaticResource Section}" Margin="0,0,0,12" />
+       <TextBlock Text="{Binding IntervalsText}" FontSize="24" FontWeight="SemiBold" />
+       <TextBlock Text="O primeiro estudo de um assunto inicia o ciclo. Cada intervalo é contado após a etapa anterior: com 1, 7 e 30 dias, a próxima data acompanha o dia em que você realmente revisou. Ao concluir a sequência, o ciclo termina." Style="{StaticResource Hint}" Margin="0,12,0,16" />
+       <Button Content="Alterar intervalos para novos ciclos" Command="{Binding SettingsCommand}" HorizontalAlignment="Left" />
+      </StackPanel></Border>
+      <Border Style="{StaticResource Card}"><StackPanel>
+       <TextBlock Text="Dados neste computador" Style="{StaticResource Section}" Margin="0,0,0,12" />
+       <TextBlock Text="Seus cadastros e sessões ficam em um banco SQLite local, sem conta ou conexão. A cada confirmação de um formulário, os dados são salvos." />
+       <TextBox Text="{Binding DatabasePath, Mode=OneWay}" IsReadOnly="True" Margin="0,14,0,10" AutomationProperties.Name="Local do banco de dados" />
+       <TextBlock Text="Para fazer uma cópia manual, feche o aplicativo e copie a pasta inteira que contém o banco. Para restaurar, feche o aplicativo e substitua a pasta pela cópia. Mantenha a versão anterior até verificar a restauração." Style="{StaticResource Hint}" />
+      </StackPanel></Border>
+     </StackPanel></ScrollViewer>
+    </TabItem>
+   </TabControl>
+  </DockPanel>
+ </Grid>
+</Window>

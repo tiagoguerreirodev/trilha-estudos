@@ -1,0 +1,7 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)Version.props" />
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>
