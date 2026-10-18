@@ -10,7 +10,7 @@ public enum EntityKind { Plan, Discipline, Topic, Session }
 public sealed record StudyPlan(int Id, string Name, string Institution, DateOnly? ExamDate, string Notes);
 public sealed record Discipline(int Id, int PlanId, string Name, int Position);
 public sealed record Topic(int Id, int DisciplineId, int? ParentId, string Name,
-    TopicStatus Status, Priority Priority, string Notes, int Position);
+    TopicStatus Status, Priority Priority, string Notes, int Position, bool PreviouslyStudied = false);
 public sealed record StudySession(int Id, int TopicId, SessionKind Kind, DateOnly Date,
     int Minutes, string Notes, int? CycleId);
 public sealed record ReviewCycle(int Id, int TopicId, DateOnly BaseDate, int? AnchorSessionId,
@@ -67,6 +67,15 @@ public sealed class StudySnapshot
         return $"{plan.Name} › {discipline.Name} › {parent}{topic.Name}";
     }
     public bool IsGroup(Topic topic) => Topics.Any(t => t.ParentId == topic.Id);
+    public string PreviousStudyLabel(Topic topic)
+    {
+        var children = Topics.Where(t => t.ParentId == topic.Id).ToArray();
+        if (children.Length == 0) return topic.PreviouslyStudied ? "Estudado anteriormente" : "Sem marcação de estudo anterior";
+        var marked = children.Count(t => t.PreviouslyStudied);
+        return marked == 0 ? "Estudo anterior: nenhum subassunto marcado"
+            : marked == children.Length ? "Estudado anteriormente • Todos os subassuntos"
+            : $"Estudo anterior: {marked} de {children.Length} subassuntos";
+    }
     public IEnumerable<int> TopicFamily(int id) => Topics.Where(t => t.Id == id || t.ParentId == id).Select(t => t.Id);
     public long MinutesFor(int id)
     {

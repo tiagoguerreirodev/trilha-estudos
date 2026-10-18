@@ -14,9 +14,12 @@ public sealed class MainViewModel : Observable
     private DateOnly _lastDay = DateOnly.FromDateTime(DateTime.Now);
     private bool _refreshing;
     private bool _ready;
-    public MainViewModel(StudyStore store, IAppUpdater? updater = null)
+    private readonly Func<string, bool> _confirmPreviousStudy;
+    public MainViewModel(StudyStore store, IAppUpdater? updater = null, Func<string, bool>? confirmPreviousStudy = null)
     {
         _store = store;
+        _confirmPreviousStudy = confirmPreviousStudy ?? (message => MessageBox.Show(Application.Current.MainWindow,
+            message, "Estudo anterior em grupo", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes);
         Updates = new UpdateViewModel(updater ?? new UnavailableAppUpdater(), store, () => !IsBusy);
         ShowUpdatesCommand = Command(() => { PageIndex = 5; return Task.CompletedTask; });
         NewPlanCommand = Command(NewPlan);
@@ -28,6 +31,8 @@ public sealed class MainViewModel : Observable
         MoveUpCommand = Command(() => Move(-1), () => CanMove(-1));
         MoveDownCommand = Command(() => Move(1), () => CanMove(1));
         NewSessionCommand = Command(NewSession, () => _snapshot.Topics.Count > 0);
+        MarkPreviouslyStudiedCommand = Command(() => SetPreviousStudy(true), () => PreviousStudyFamily().Any(t => !t.PreviouslyStudied || t.Status != TopicStatus.Completed));
+        RemovePreviouslyStudiedCommand = Command(() => SetPreviousStudy(false), () => PreviousStudyFamily().Any(t => t.PreviouslyStudied));
         EditSessionCommand = Command(EditSession, () => SelectedSession != null);
         DeleteSessionCommand = Command(DeleteSession, () => SelectedSession != null);
         RestartCycleCommand = Command(RestartCycle, () => CurrentTopic != null && !_snapshot.PendingReviews().Any(r => r.TopicId == CurrentTopic.Id));
@@ -118,7 +123,12 @@ public sealed class MainViewModel : Observable
         get => _selectedNode;
         set
         {
+            // A reconstrução da árvore pode emitir seleção transitória de outro nó.
+            if (_refreshing) return;
+            var previous = _selectedNode;
             if (!Set(ref _selectedNode, value)) return;
+            if (previous != null) previous.IsSelected = false;
+            if (value != null) value.IsSelected = true;
             RefreshSelection();
         }
     }
@@ -167,6 +177,8 @@ public sealed class MainViewModel : Observable
     public ICommand MoveUpCommand { get; }
     public ICommand MoveDownCommand { get; }
     public ICommand NewSessionCommand { get; }
+    public ICommand MarkPreviouslyStudiedCommand { get; }
+    public ICommand RemovePreviouslyStudiedCommand { get; }
     public ICommand EditSessionCommand { get; }
     public ICommand DeleteSessionCommand { get; }
     public ICommand RestartCycleCommand { get; }
@@ -189,7 +201,8 @@ public sealed class MainViewModel : Observable
     private ContentNode TopicNode(Topic t) => new()
     {
         Id = t.Id, Kind = EntityKind.Topic, Name = t.Name,
-        Detail = $"{t.Status.Text()} • {t.Priority.Text()}" + (_snapshot.IsGroup(t) ? " • Grupo" : ""),
+        Detail = $"{t.Status.Text()} • {t.Priority.Text()}" + (_snapshot.IsGroup(t) ? " • Grupo" : "")
+            + (t.PreviouslyStudied || _snapshot.IsGroup(t) ? "\n" + _snapshot.PreviousStudyLabel(t) : ""),
         Children = _snapshot.Topics.Where(x => x.ParentId == t.Id).Select(TopicNode).ToList(),
         IsSelected = _selectedNode?.Kind == EntityKind.Topic && _selectedNode.Id == t.Id
     };
@@ -241,7 +254,7 @@ public sealed class MainViewModel : Observable
             SelectedStatus is { Id: >= 0 } st ? (TopicStatus)st.Id : null,
             SelectedPriority is { Id: >= 0 } pr ? (Priority)pr.Id : null, PendingOnly, Search))
             .Select(t => new TopicRow(t.Id, t.Name, _snapshot.PathOf(t), t.Status.Text(), t.Priority.Text(),
-                Labels.Duration(_snapshot.MinutesFor(t.Id)), _snapshot.IsGroup(t) ? "Grupo" : "Item final")).ToArray();
+                Labels.Duration(_snapshot.MinutesFor(t.Id)), _snapshot.IsGroup(t) ? "Grupo" : "Item final", _snapshot.PreviousStudyLabel(t))).ToArray();
         SelectedTopicRow = TopicRows.FirstOrDefault(t => t.Id == SelectedTopicRow?.Id);
         Raise(nameof(TopicRows)); Raise(nameof(ResultHint));
     }
@@ -267,6 +280,7 @@ public sealed class MainViewModel : Observable
             SelectionTitle = t.Name;
             var due = _snapshot.PendingReviews().SingleOrDefault(r => r.TopicId == t.Id);
             SelectionDetails = $"{_snapshot.PathOf(t)}\n\n{t.Status.Text()} • Prioridade {t.Priority.Text().ToLowerInvariant()}\nTempo: {Labels.Duration(_snapshot.MinutesFor(t.Id))}\n" +
+                _snapshot.PreviousStudyLabel(t) + "\n" +
                 (due == null ? "Sem revisão pendente neste assunto.\n" : $"Próxima revisão: {due.Date:dd/MM/yyyy} • Etapa {due.Label}\n") +
                 (_snapshot.IsGroup(t) ? "Grupo: o status e o tempo resumem os subassuntos; o tempo inclui sessões próprias.\n" : "") + $"\n{t.Notes}";
             var family = _snapshot.TopicFamily(t.Id).ToHashSet();
@@ -357,6 +371,26 @@ public sealed class MainViewModel : Observable
         2 => SelectedTopicRow?.Id, 4 => SelectedReview?.TopicId, 3 => SelectedSession is { } row ? _snapshot.Sessions.Single(s => s.Id == row.Id).TopicId : null,
         _ => CurrentTopic?.Id
     };
+    private IEnumerable<Topic> PreviousStudyFamily()
+    {
+        var id = PageIndex == 2 ? SelectedTopicRow?.Id : PageIndex == 1 ? CurrentTopic?.Id : null;
+        return id == null ? [] : _snapshot.Topics.Where(t => t.Id == id || t.ParentId == id);
+    }
+    private async Task SetPreviousStudy(bool value)
+    {
+        var family = PreviousStudyFamily().ToArray();
+        if (family.Length == 0) return;
+        var topic = family.Single(t => t.ParentId == null || family.All(p => p.Id != t.ParentId));
+        var count = family.Length - 1;
+        if (count > 0)
+        {
+            var effect = value ? "O grupo e seus subassuntos serão concluídos e marcados como estudados anteriormente."
+                : "A marcação será removida do grupo e dos subassuntos. Os status atuais serão mantidos.";
+            if (!_confirmPreviousStudy($"{topic.Name}\n\nEsta ação afeta {count} subassunto(s). {effect}\n\nNão cria sessões, não soma tempo e não altera revisões. Continuar?")) return;
+        }
+        await _store.SetPreviouslyStudiedAsync(topic.Id, value);
+        await Reload();
+    }
     private Task NewSession() => SessionEditor(null, SessionTopicId(), PageIndex == 4 ? SessionKind.Review : SessionKind.Study);
     private Task EditSession()
     {

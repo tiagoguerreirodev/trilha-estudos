@@ -34,7 +34,9 @@ internal static class UiChecks
                     Directory.CreateDirectory(outputDirectory);
                     var store = new StudyStore(Path.Combine(testRoot, "ui", "isolated.db"));
                     await store.InitializeAsync();
-                    var vm = new MainViewModel(store);
+                    var allowGroup = false;
+                    var confirmations = new List<string>();
+                    var vm = new MainViewModel(store, confirmPreviousStudy: message => { confirmations.Add(message); return allowGroup; });
                     window = new MainWindow { DataContext = vm, ShowActivated = false, ShowInTaskbar = false, Left = -30000, Top = -30000 };
                     application.MainWindow = window; window.Show(); await vm.InitializeAsync();
                     Require(vm.Error.Length == 0 && !vm.NeedsInitialization && vm.Empty, "A primeira execução da interface falhou: " + vm.Error);
@@ -55,6 +57,22 @@ internal static class UiChecks
                     await Submit(vm.NewSessionCommand, vm, v => { v["date"].Date = today.AddDays(-3).ToDateTime(TimeOnly.MinValue); v["minutes"].Text = "45"; v["notes"].Text = "Anotação de verificação"; });
                     await vm.InitializeAsync();
                     Require(vm.Summary.Total == 3 && vm.Summary.Completed == 1 && vm.ReviewRows.Count == 1, "O painel não recebeu os dados.");
+                    await Execute(vm.MarkPreviouslyStudiedCommand, vm);
+                    Require(vm.SelectionDetails.Contains("Estudado anteriormente") && vm.Summary.Completed == 2
+                        && vm.Summary.Minutes == 45 && vm.SessionRows.Count == 1 && vm.ReviewRows.Count == 1 && confirmations.Count == 0,
+                        $"Marcação individual divergente: seleção={vm.SelectionTitle}, concluídos={vm.Summary.Completed}, minutos={vm.Summary.Minutes}, sessões={vm.SessionRows.Count}, revisões={vm.ReviewRows.Count}, confirmações={confirmations.Count}, detalhes={vm.SelectionDetails}.");
+                    vm.PageIndex = 2; vm.Search = "ARGUMENTACAO"; vm.SelectedTopicRow = vm.TopicRows.Single();
+                    await Execute(vm.MarkPreviouslyStudiedCommand, vm);
+                    Require(vm.TopicRows.Single().PreviousStudy.Contains("Estudado anteriormente"), "Busca não apresentou marcação.");
+                    await Execute(vm.RemovePreviouslyStudiedCommand, vm);
+                    Require(vm.TopicRows.Single().Status == "Concluído" && vm.TopicRows.Single().PreviousStudy.Contains("Sem marcação"), "Remover na busca alterou status.");
+                    vm.Search = ""; vm.PageIndex = 1; vm.SelectedNode = vm.Tree[0].Children[0].Children.Single(n => n.Id == group);
+                    var activities = (await store.ReadAsync()).Activities.Count;
+                    await Execute(vm.MarkPreviouslyStudiedCommand, vm);
+                    Require(confirmations.Count == 1 && confirmations[0].Contains("2 subassunto(s)") && (await store.ReadAsync()).Activities.Count == activities, "Cancelar grupo gravou dados ou omitiu quantidade.");
+                    allowGroup = true; await Execute(vm.MarkPreviouslyStudiedCommand, vm);
+                    Require(vm.SelectionDetails.Contains("Todos os subassuntos") && vm.Summary.Completed == 3, "Grupo não atualizou interface.");
+                    Require(vm.SelectedNode!.Detail.Contains("Estudado anteriormente"), "Árvore não apresentou marcação.");
                     for (var page = 0; page < 6; page++)
                     {
                         vm.PageIndex = page;
@@ -94,6 +112,14 @@ internal static class UiChecks
         return completion.Task.WaitAsync(TimeSpan.FromSeconds(60));
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    private static async Task Execute(ICommand command, MainViewModel vm)
+    {
+        Require(command.CanExecute(null), $"Comando de estudo anterior desabilitado: página={vm.PageIndex}, seleção={vm.SelectedNode?.Kind}/{vm.SelectedNode?.Id}, ocupado={vm.IsBusy}, erro={vm.Error}."); command.Execute(null);
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.IsBusy && DateTime.UtcNow < until) await Task.Delay(25);
+        Require(!vm.IsBusy && vm.Error.Length == 0, "Falha no comando: " + vm.Error);
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+    }
     private static async Task Submit(ICommand command, MainViewModel vm, Action<EditorViewModel> fill)
     {
         Require(command.CanExecute(null), "O comando de cadastro está desabilitado.");

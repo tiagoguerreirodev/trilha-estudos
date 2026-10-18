@@ -43,6 +43,6 @@ public sealed class ContentNode : Observable
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
 }
-public sealed record TopicRow(int Id, string Name, string Path, string Status, string Priority, string Time, string Group);
+public sealed record TopicRow(int Id, string Name, string Path, string Status, string Priority, string Time, string Group, string PreviousStudy);
 public sealed record SessionRow(int Id, string Date, string Kind, string Path, string Duration, string Notes);
 public sealed record ReviewRow(int TopicId, string Date, string Path, string Step, string State);

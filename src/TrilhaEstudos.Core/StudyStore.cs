@@ -90,8 +90,16 @@ public sealed class StudyStore
     {
         using var version = c.CreateCommand(); version.CommandText = "PRAGMA user_version";
         var schema = Convert.ToInt32(version.ExecuteScalar());
-        if (schema > 1) throw new InvalidOperationException("Este banco foi criado por uma versão mais recente do aplicativo. Use a versão correspondente; o banco foi preservado.");
+        if (schema > 2) throw new InvalidOperationException("Este banco foi criado por uma versão mais recente do aplicativo. Use a versão correspondente; o banco foi preservado.");
         Exec(c, null, "PRAGMA journal_mode=WAL");
+        if (schema == 1)
+        {
+            try { Backup(c); }
+            catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                throw new InvalidOperationException("Não foi possível criar e validar o backup antes de atualizar o banco. A migração não foi iniciada e seus dados foram preservados. Verifique as permissões e o espaço em disco.", ex);
+            }
+        }
         using var tx = c.BeginTransaction();
         if (schema == 0)
         {
@@ -101,7 +109,8 @@ public sealed class StudyStore
                 CREATE TABLE Topic(Id INTEGER PRIMARY KEY, DisciplineId INTEGER NOT NULL REFERENCES Discipline(Id) ON DELETE CASCADE,
                     ParentId INTEGER REFERENCES Topic(Id) ON DELETE CASCADE, Name TEXT NOT NULL,
                     Status INTEGER NOT NULL CHECK(Status BETWEEN 0 AND 2), Priority INTEGER NOT NULL CHECK(Priority BETWEEN 0 AND 2),
-                    Notes TEXT NOT NULL, Position INTEGER NOT NULL, CHECK(ParentId IS NULL OR ParentId <> Id));
+                    Notes TEXT NOT NULL, Position INTEGER NOT NULL,
+                    PreviouslyStudied INTEGER NOT NULL DEFAULT 0 CHECK(PreviouslyStudied IN (0,1)), CHECK(ParentId IS NULL OR ParentId <> Id));
                 CREATE TABLE ReviewCycle(Id INTEGER PRIMARY KEY, TopicId INTEGER NOT NULL REFERENCES Topic(Id) ON DELETE CASCADE,
                     BaseDate TEXT NOT NULL, AnchorSessionId INTEGER REFERENCES StudySession(Id) ON DELETE SET NULL,
                     Intervals TEXT NOT NULL, Superseded INTEGER NOT NULL DEFAULT 0);
@@ -118,8 +127,12 @@ public sealed class StudyStore
                 CREATE INDEX IX_Session_Topic ON StudySession(TopicId, Date);
                 CREATE INDEX IX_Session_Cycle ON StudySession(CycleId);
                 CREATE INDEX IX_Cycle_Topic ON ReviewCycle(TopicId);
-                PRAGMA user_version=1;
+                PRAGMA user_version=2;
                 """);
+        }
+        else if (schema == 1)
+        {
+            Exec(c, tx, "ALTER TABLE Topic ADD COLUMN PreviouslyStudied INTEGER NOT NULL DEFAULT 0 CHECK(PreviouslyStudied IN (0,1)); PRAGMA user_version=2;");
         }
         tx.Commit(); return true;
     });
@@ -129,7 +142,8 @@ public sealed class StudyStore
         using var tx = c.BeginTransaction(); var snapshot = Read(c, tx); tx.Commit(); return snapshot;
     });
 
-    public Task<string> BackupAsync() => Run(c =>
+    public Task<string> BackupAsync() => Run(Backup);
+    private string Backup(SqliteConnection c)
     {
         var folder = Path.Combine(Path.GetDirectoryName(_path)!, "backups");
         Directory.CreateDirectory(folder);
@@ -141,9 +155,9 @@ public sealed class StudyStore
         using var check = backup.CreateCommand();
         check.CommandText = "PRAGMA integrity_check";
         if (!string.Equals(check.ExecuteScalar()?.ToString(), "ok", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Não foi possível validar o backup. A atualização não será instalada.");
+            throw new InvalidOperationException("Não foi possível validar o backup do banco local.");
         return backupPath;
-    });
+    }
     private static StudySnapshot Read(SqliteConnection c, SqliteTransaction tx)
     {
         List<T> Rows<T>(string sql, Func<SqliteDataReader, T> map)
@@ -156,7 +170,7 @@ public sealed class StudyStore
         {
             Plans = Rows("SELECT * FROM StudyPlan ORDER BY Name, Id", r => new StudyPlan(r.GetInt32(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : Date(r.GetString(3)), r.GetString(4))),
             Disciplines = Rows("SELECT * FROM Discipline ORDER BY Position, Id", r => new Discipline(r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetInt32(3))),
-            Topics = Rows("SELECT * FROM Topic ORDER BY Position, Id", r => new Topic(r.GetInt32(0), r.GetInt32(1), NullableId(r, 2), r.GetString(3), (TopicStatus)r.GetInt32(4), (Priority)r.GetInt32(5), r.GetString(6), r.GetInt32(7))),
+            Topics = Rows("SELECT Id,DisciplineId,ParentId,Name,Status,Priority,Notes,Position,PreviouslyStudied FROM Topic ORDER BY Position, Id", r => new Topic(r.GetInt32(0), r.GetInt32(1), NullableId(r, 2), r.GetString(3), (TopicStatus)r.GetInt32(4), (Priority)r.GetInt32(5), r.GetString(6), r.GetInt32(7), r.GetBoolean(8))),
             Sessions = Rows("SELECT * FROM StudySession ORDER BY Date DESC, Id DESC", r => new StudySession(r.GetInt32(0), r.GetInt32(1), (SessionKind)r.GetInt32(2), Date(r.GetString(3)), r.GetInt32(4), r.GetString(5), NullableId(r, 6))),
             Cycles = Rows("SELECT * FROM ReviewCycle ORDER BY Id", r => new ReviewCycle(r.GetInt32(0), r.GetInt32(1), Date(r.GetString(2)), NullableId(r, 3), ParseIntervals(r.GetString(4)), r.GetBoolean(5))),
             Activities = Rows("SELECT * FROM Activity ORDER BY Id DESC", r => new Activity(r.GetInt32(0), NullableId(r, 1), DateTimeOffset.Parse(r.GetString(2), CultureInfo.InvariantCulture), r.GetString(3))),
@@ -225,6 +239,20 @@ public sealed class StudyStore
         var result = id ?? InsertId(c, tx);
         if (id != null && applyGroupStatus) Exec(c, tx, "UPDATE Topic SET Status=$s WHERE ParentId=$id", ("$s", (int)status), ("$id", id));
         Log(c, tx, discipline.PlanId, $"Assunto {(id == null ? "criado" : "editado")}: {name}"); return result;
+    });
+
+    public Task SetPreviouslyStudiedAsync(int topicId, bool value) => Mutate((c, tx, s) =>
+    {
+        var topic = s.Topics.SingleOrDefault(t => t.Id == topicId)
+            ?? throw new InvalidOperationException("Selecione um assunto válido.");
+        var family = s.Topics.Where(t => t.Id == topicId || t.ParentId == topicId).ToArray();
+        if (family.All(t => t.PreviouslyStudied == value && (!value || t.Status == TopicStatus.Completed))) return false;
+        Exec(c, tx, value
+            ? "UPDATE Topic SET PreviouslyStudied=1,Status=2 WHERE Id=$id OR ParentId=$id"
+            : "UPDATE Topic SET PreviouslyStudied=0 WHERE Id=$id OR ParentId=$id", ("$id", topicId));
+        Log(c, tx, s.PlanIdOf(topic), value ? $"Marcado como estudado anteriormente: {topic.Name}"
+            : $"Marcação de estudo anterior removida: {topic.Name}");
+        return true;
     });
 
     public Task<int> SaveSessionAsync(int? id, int topicId, SessionKind kind, DateOnly date, int minutes, string notes) => Mutate((c, tx, s) =>

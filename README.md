@@ -9,6 +9,7 @@ Aplicativo nativo WPF para Windows 11 em português do Brasil. O conteúdo come�
 - Editais e planos com instituição/prova, data opcional e observações.
 - Disciplinas, assuntos e um nível de subassuntos, com edição, exclusão e reordenação entre irmãos.
 - Status, prioridade e observações. O percentual conta somente os itens finais. Grupos agregam o status dos filhos; alterar o status de um grupo aplica o novo status aos filhos.
+- Marcação de estudo anterior: conclui assuntos já estudados sem criar sessão, somar tempo ou iniciar revisões. A indicação histórica permanece disponível na árvore, nos detalhes e na busca.
 - Sessões manuais de estudo e revisão, com data, minutos e anotação, histórico, correção e exclusão.
 - Painel com progresso, tempo, atividades recentes e revisões de hoje/atrasadas. Busca sem distinção de acentos ou maiúsculas, com filtros combináveis.
 - Ciclos automáticos de revisão, confirmação de remoções e descarte de formulários modificados.
@@ -130,6 +131,9 @@ Esse parâmetro troca somente a pasta do banco; não cria exemplos. Apenas uma i
 
 - Datas de sessões são datas locais, sem horário; não podem estar no futuro. Durações são minutos inteiros de 1 a 1440. A prova pode ter data passada. Nomes têm 1 a 200 caracteres após remover espaços; observações têm até 10.000.
 - Sessões não alteram o status automaticamente. O usuário controla o avanço manualmente.
+- **Marcar como já estudado**, disponível nos detalhes do conteúdo e na busca, conclui o assunto e registra a indicação **Estudado anteriormente**. Não solicita data ou duração e não cria sessões nem altera revisões. O tempo continua sendo calculado exclusivamente pelas sessões reais.
+- Em grupos, marcar ou remover a marcação pede confirmação com a quantidade de subassuntos afetados. A ação inclui o grupo e todos os filhos existentes; novos filhos começam sem marcação. O grupo mostra nenhum, alguns ou todos os filhos marcados.
+- **Remover marcação de estudo anterior** retira somente a indicação histórica e mantém o status atual. Para alterar a conclusão, use **Editar**. Editar nome, prioridade, observações ou status preserva a marcação histórica; não é preciso registrar uma sessão para concluir um assunto.
 - Pai com subassuntos é um grupo: concluído quando todos os filhos estão concluídos; não iniciado quando todos estão não iniciados; em andamento nos demais casos. O percentual usa apenas folhas, com o mesmo peso.
 - Sessões e ciclos do pai são preservados ao subdividi-lo. O pai pode receber sessões sobre o tema inteiro. O tempo do grupo soma sessões próprias e dos filhos; o painel soma cada sessão apenas uma vez.
 - Adicionar um subassunto novo não iniciado pode reduzir o percentual de conclusão. Remover o último subassunto conserva o último status agregado do pai.
@@ -141,6 +145,8 @@ Esse parâmetro troca somente a pasta do banco; não cria exemplos. Apenas uma i
 - O ciclo termina após sua última etapa. Novas sessões não o reiniciam. **Iniciar novo ciclo** usa hoje e os intervalos vigentes, somente quando não há ciclo pendente. Os ciclos anteriores ficam arquivados, preservando o histórico e evitando duas pendências após correções antigas.
 - As pendências são atualizadas ao abrir, salvar e mudar o dia com a janela aberta. Não há serviço, notificação externa ou execução em segundo plano após fechar.
 - Assunto e tipo de uma sessão existente são fixos. Para corrigir esses vínculos, exclua e cadastre novamente; data, duração e anotação são editáveis.
+
+Na versão 1.1.0, bancos do esquema 1 são migrados automaticamente para o esquema 2, após criação e validação de backup SQLite na pasta `backups`, ao lado do banco. Se o backup falhar, a migração não começa. Nenhum assunto antigo é marcado automaticamente. Versões até 1.0.2 não abrem o esquema 2; uma restauração para essas versões exige o backup anterior, com o aplicativo fechado.
 
 ## Testes manuais
 
@@ -155,6 +161,7 @@ Use um banco isolado pelo parâmetro acima, se desejar. Os exemplos abaixo são 
 7. **Ciclos:** configurar um único intervalo para novos ciclos, criar um assunto e registrar estudo/revisão. Conferir encerramento; iniciar novo ciclo e verificar que usa hoje. O ciclo anterior não deve reaparecer ao corrigir seus registros.
 8. **Persistência e interface:** fechar e reabrir. Conferir editais, ordem, status, notas, sessões, intervalos e revisões. Redimensionar, testar Tab/Shift+Tab/Enter/Esc e escala do Windows em 150%/200%; conferir rolagem e acesso aos botões.
 9. **Atualizações:** conferir versão nas Configurações; consultar sem conexão e continuar estudando. Com uma release superior, conferir notas, cancelar download e baixar novamente. Instalar somente ao confirmar, conferir backup, versão nova e os mesmos estudos após reiniciar. Pacotes locais de teste 1.0.0 → 1.0.1 devem usar um identificador e banco exclusivos; não publique a versão de teste no GitHub.
+10. **Estudo anterior:** marcar um assunto nos detalhes e outro pela busca. Conferir conclusão, indicação textual e tempo inalterado, sem novas sessões ou revisões. Em um grupo, cancelar a confirmação e conferir que nada mudou; depois confirmar e verificar os filhos. Remover a marcação, confirmar que os status permanecem e cadastrar um novo subassunto sem marcação. Fechar e reabrir para verificar persistência. Na atualização 1.0.2 → 1.1.0, conferir a criação do backup da migração e a preservação dos registros anteriores.
 
 ## Estrutura e verificações automatizadas
 

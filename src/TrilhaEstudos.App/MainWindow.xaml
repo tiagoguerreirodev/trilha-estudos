@@ -135,6 +135,12 @@
            <Button Content="Mover para baixo" Command="{Binding MoveDownCommand}" />
           </WrapPanel>
           <WrapPanel Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}">
+           <Button Content="Marcar como já estudado" Command="{Binding MarkPreviouslyStudiedCommand}" />
+           <Button Content="Remover marcação de estudo anterior" Command="{Binding RemovePreviouslyStudiedCommand}" ToolTip="Remove somente a marcação. Para alterar o status, use Editar." />
+          </WrapPanel>
+          <TextBlock Text="Estudo anterior conclui o conteúdo sem registrar sessão ou tempo e sem iniciar revisões. Remover a marcação mantém o status atual."
+           Style="{StaticResource Hint}" Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}" />
+          <WrapPanel Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}">
            <Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" />
            <Button Content="Iniciar novo ciclo" Command="{Binding RestartCycleCommand}" ToolTip="Disponível quando não há ciclo pendente. Inicia a partir de hoje." />
           </WrapPanel>
@@ -166,15 +172,20 @@
        </WrapPanel>
       </StackPanel>
       <StackPanel Grid.Row="1">
-       <WrapPanel><Button Content="Limpar filtros" Command="{Binding ClearFiltersCommand}" /><Button Content="Abrir assunto" Command="{Binding OpenTopicCommand}" /><Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" /></WrapPanel>
+       <WrapPanel><Button Content="Limpar filtros" Command="{Binding ClearFiltersCommand}" /><Button Content="Abrir assunto" Command="{Binding OpenTopicCommand}" /><Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" />
+        <Button Content="Marcar como já estudado" Command="{Binding MarkPreviouslyStudiedCommand}" />
+        <Button Content="Remover marcação de estudo anterior" Command="{Binding RemovePreviouslyStudiedCommand}" ToolTip="Remove somente a marcação; mantém o status atual." />
+       </WrapPanel>
+       <TextBlock Text="Estudo anterior conclui sem registrar sessão ou tempo e sem iniciar revisões. Remover a marcação mantém o status atual." Style="{StaticResource Hint}" />
        <TextBlock Text="{Binding ResultHint}" Style="{StaticResource Hint}" />
       </StackPanel>
-      <DataGrid Grid.Row="2" ItemsSource="{Binding TopicRows}" SelectedItem="{Binding SelectedTopicRow}" RowHeight="58" AutomationProperties.Name="Resultados da busca">
+      <DataGrid Grid.Row="2" ItemsSource="{Binding TopicRows}" SelectedItem="{Binding SelectedTopicRow}" RowHeight="76" AutomationProperties.Name="Resultados da busca">
        <DataGrid.Columns>
         <DataGridTemplateColumn Header="Assunto e caminho" Width="*" MinWidth="240">
          <DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Margin="6,5" ToolTip="{Binding Path}">
           <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
           <TextBlock Text="{Binding Path}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding PreviousStudy}" FontSize="11" Foreground="{StaticResource Muted}" ToolTip="{Binding PreviousStudy}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
          </StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate>
         </DataGridTemplateColumn>
         <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="125" />
