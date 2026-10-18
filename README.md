@@ -71,7 +71,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish.ps1
 Para gerar outro pacote local, sem alterar a versão central nem publicar uma release:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -Version 1.0.1 -OutputDirectory artifacts\teste-1.0.1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish.ps1 -Version 1.0.3 -OutputDirectory artifacts\teste-1.0.3
 ```
 
 O instalador é `artifacts\releases\TrilhaEstudos.App-win-x64-Setup.exe`. Distribua esse arquivo e execute-o normalmente no Windows 11 x64. A instalação é por usuário, sem administrador, inclui o runtime e cria atalhos e desinstalador. O destino padrão é `%LOCALAPPDATA%\TrilhaEstudos.App`; os estudos ficam separadamente em `%LOCALAPPDATA%\TrilhaEstudos`. Não exige .NET instalado no computador de destino. O pacote completo, o manifesto `releases.win-x64.json` e `SHA256SUMS.txt` servem à distribuição das atualizações.
@@ -84,13 +84,17 @@ Esta entrega não cria MSI/MSIX nem tem assinatura digital. O Windows pode mostr
 
 `Version.props` centraliza a versão semântica `MAJOR.MINOR.PATCH` e o repositório público. Metadados do executável usam quatro números, por exemplo `1.0.0.0`; a interface mostra `1.0`; pacote e instalador usam `1.0.0`; a tag é `v1.0.0`. Correções incrementam PATCH; funcionalidades compatíveis, MINOR; mudanças incompatíveis, MAJOR.
 
-O workflow **CI** executa restauração, compilação Release e verificações em pushes na `main` e pull requests. As ações oficiais estão fixadas por SHA. Para publicar, abra **Actions → Publicar release → Run workflow**, selecione `main`, informe uma versão como `1.0.1` e execute. Somente a primeira publicação aceita a versão atual `1.0.0`; as seguintes exigem uma versão superior.
+O workflow **CI** executa restauração, compilação Release e verificações em pushes na `main` e pull requests. As ações oficiais estão fixadas por SHA. Para publicar, abra **Actions → Publicar release → Run workflow**, selecione `main`, informe uma versão superior à registrada em `Version.props` e execute. Somente a primeira publicação aceita a versão atual `1.0.0`; as seguintes exigem uma versão superior.
 
 O fluxo prepara um commit local de versão, compila, verifica e empacota. Confere que a `main` remota não mudou e envia commit e tag juntos, sem force push. Cria uma release em rascunho, anexa todos os arquivos e só então publica como estável mais recente. Publicações são serializadas. Se houver falha após criar a tag ou o rascunho, execute novamente com a mesma versão para retomar o mesmo commit. Uma release já publicada é recusada. O token temporário do GitHub tem escrita somente no job de publicação e nunca entra no aplicativo. Regras de proteção que impeçam escrita na `main` pelo `GITHUB_TOKEN` precisam ser ajustadas pelo proprietário antes de usar esse fluxo.
 
 No aplicativo instalado, **Configurações** mostra versão, estado, notas da release e as ações **Verificar atualizações**, **Baixar atualização**, **Cancelar download** e **Reiniciar e instalar**. A consulta inicial ocorre em segundo plano; indisponibilidade de rede não bloqueia os estudos. Apenas versões estáveis superiores do canal `win-x64` são oferecidas, sem token ou login do usuário. O Velopack valida o pacote antes de habilitar a instalação. Baixar não instala automaticamente, inclusive ao reabrir o aplicativo.
 
 A correção **1.0.1** aumenta o prazo da consulta para dois minutos, permitindo a resposta do GitHub em redes lentas ou com proxy. A versão 1.0.0 pode cancelar essa consulta após 15 segundos; nesse caso, instale a versão corrigida pelo link da versão estável. Os dados são reutilizados. A release 1.0.0 permanece preservada.
+
+A partir da **1.0.2**, cada verificação faz somente uma requisição a `GET /repos/tiagoguerreirodev/trilha-estudos/releases/latest`. Uma versão igual ou inferior encerra a consulta imediatamente. Uma versão superior apresenta a versão e as notas da API, sem baixar manifesto ou pacote. A conexão HTTP é reutilizada, sem cache persistente, e a frequência de consulta permanece a mesma.
+
+Ao solicitar o download, o aplicativo lê apenas o manifesto `releases.win-x64.json` da release selecionada, confere identificador, canal e versão e entrega o pacote ao Velopack para validar sua integridade. Os endereços ficam vinculados àquela release; publicar outra versão durante o download não troca o pacote escolhido. Nenhuma tag móvel `latest` é criada: as tags versionadas continuam preservadas, e a indicação de release mais recente é mantida pelo GitHub.
 
 Ao confirmar a instalação, novas gravações são bloqueadas, operações anteriores terminam e a API de backup do SQLite cria uma cópia consistente em `%LOCALAPPDATA%\TrilhaEstudos\backups`. A cópia é validada antes do encerramento normal e da substituição dos binários. Uma falha mantém o aplicativo aberto. Guarde os backups conforme sua necessidade; não há exclusão automática deles.
 
@@ -163,6 +167,8 @@ dotnet run --project .\tests\TrilhaEstudos.Checks -c Release --no-build -- --ui 
 ```
 
 A verificação de interface abre janelas próprias fora da área visível, carrega os bindings, cadastra edital/disciplina/assunto/sessão pelos formulários, verifica a busca e renderiza as seis telas, a primeira execução e um formulário. O conteúdo usado nessa verificação existe apenas em um banco temporário excluído ao terminar. Não é um modo demonstrativo do aplicativo. A verificação automatizada não substitui os testes manuais de teclado e escala do Windows.
+
+As verificações HTTP usam respostas simuladas, sem acessar o GitHub: contam as requisições, impedem downloads durante a consulta, simulam outra publicação entre consulta e download, validam manifesto e pacote e cobrem falhas de rede/API e cancelamento efetivo. Medições com a rede real e testes de atualização entre pacotes são registrados separadamente no relatório de validação.
 
 O arquivo `artifacts\ENTREGA_COMPLETA.md`, quando presente, reúne a árvore completa e o conteúdo integral dos arquivos necessários, nesta ordem: resumo, árvore, arquivos, instalação/execução, publicação e testes manuais. Arquivos gerados (`bin`, `obj`, ferramentas e artefatos) não são necessários para reconstruir o projeto.
 

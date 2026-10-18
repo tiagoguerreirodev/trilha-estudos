@@ -258,6 +258,8 @@ await Check("Atividades filtradas e resumo por edital", async store =>
 
 try { passed += await UpdateChecks.RunAsync(root); }
 catch (Exception ex) { failed++; Console.WriteLine($"ERRO Atualizações\n{ex}"); }
+try { passed += await LatestReleaseChecks.RunAsync(root); }
+catch (Exception ex) { failed++; Console.WriteLine($"ERRO Consulta latest\n{ex}"); }
 var uiIndex = Array.IndexOf(args, "--ui");
 if (uiIndex >= 0)
 {

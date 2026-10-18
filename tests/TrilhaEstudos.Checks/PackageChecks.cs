@@ -15,11 +15,10 @@ internal static class PackageChecks
             "win-x64", null!, null!, Path.Combine(install, "current", "TrilhaEstudos.exe"));
         var manager = new UpdateManager(new SimpleFileSource(new DirectoryInfo(feed)),
             new UpdateOptions { ExplicitChannel = "win-x64" }, locator);
-        var updater = new VelopackAppUpdater(manager);
-        var release = await updater.CheckAsync(CancellationToken.None)
+        var release = await manager.CheckForUpdatesAsync()
             ?? throw new Exception("Pacote 1.0.1 não encontrado.");
-        if (release.Version != "1.0.1") throw new Exception("Versão incorreta no feed.");
-        await updater.DownloadAsync(release, new Progress<int>(), CancellationToken.None);
+        if (release.TargetFullRelease.Version.ToString() != "1.0.1") throw new Exception("Versão incorreta no feed.");
+        await manager.DownloadUpdatesAsync(release, _ => { }, CancellationToken.None);
         Console.WriteLine("OK   Pacote real: consulta e download com integridade validada");
         foreach (var installedVersion in new[] { "1.0.1", "1.0.2" })
         {
@@ -39,10 +38,9 @@ internal static class PackageChecks
         var badLocator = new TestVelopackLocator("TrilhaEstudos.UpdateTest", "1.0.0", Path.Combine(data, "bad-downloads"), null!);
         var badManager = new UpdateManager(new SimpleFileSource(new DirectoryInfo(broken)),
             new UpdateOptions { ExplicitChannel = "win-x64" }, badLocator);
-        var badUpdater = new VelopackAppUpdater(badManager);
-        var badRelease = await badUpdater.CheckAsync(CancellationToken.None) ?? throw new Exception("Feed corrompido ausente.");
+        var badRelease = await badManager.CheckForUpdatesAsync() ?? throw new Exception("Feed corrompido ausente.");
         var rejected = false;
-        try { await badUpdater.DownloadAsync(badRelease, new Progress<int>(), CancellationToken.None); }
+        try { await badManager.DownloadUpdatesAsync(badRelease, _ => { }, CancellationToken.None); }
         catch (Exception) { rejected = true; }
         if (!rejected) throw new Exception("Pacote real corrompido foi aceito.");
         Console.WriteLine("OK   Pacote real: conteúdo corrompido rejeitado");
