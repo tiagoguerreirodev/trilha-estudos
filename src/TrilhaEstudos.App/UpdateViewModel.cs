@@ -63,7 +63,9 @@ public sealed class UpdateViewModel : Observable
         if (!_updater.IsSupported || Busy || State == AppUpdateState.Ready) return;
         State = AppUpdateState.Checking; Status = "Consultando atualizações…";
         _release = null; RefreshRelease();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        // Redes com proxy podem levar mais de 15 segundos para responder aos redirecionamentos do GitHub.
+        // A consulta é assíncrona e não bloqueia as funções de estudo.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         try
         {
             var release = await _updater.CheckAsync(timeout.Token);

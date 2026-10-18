@@ -1,6 +1,6 @@
 # Trilha Estudos
 
-Versão **1.0** (pacote **1.0.0**). [Repositório](https://github.com/tiagoguerreirodev/trilha-estudos) · [Baixar a versão estável](https://github.com/tiagoguerreirodev/trilha-estudos/releases/latest).
+Primeira versão: **1.0** (pacote **1.0.0**). A versão instalada aparece nas Configurações. [Repositório](https://github.com/tiagoguerreirodev/trilha-estudos) · [Baixar a versão estável](https://github.com/tiagoguerreirodev/trilha-estudos/releases/latest).
 
 Aplicativo nativo WPF para Windows 11 em português do Brasil. O conteúdo começa vazio e é cadastrado manualmente. Funciona offline após a instalação/restauração das ferramentas e dependências.
 
@@ -89,6 +89,8 @@ O workflow **CI** executa restauração, compilação Release e verificações e
 O fluxo prepara um commit local de versão, compila, verifica e empacota. Confere que a `main` remota não mudou e envia commit e tag juntos, sem force push. Cria uma release em rascunho, anexa todos os arquivos e só então publica como estável mais recente. Publicações são serializadas. Se houver falha após criar a tag ou o rascunho, execute novamente com a mesma versão para retomar o mesmo commit. Uma release já publicada é recusada. O token temporário do GitHub tem escrita somente no job de publicação e nunca entra no aplicativo. Regras de proteção que impeçam escrita na `main` pelo `GITHUB_TOKEN` precisam ser ajustadas pelo proprietário antes de usar esse fluxo.
 
 No aplicativo instalado, **Configurações** mostra versão, estado, notas da release e as ações **Verificar atualizações**, **Baixar atualização**, **Cancelar download** e **Reiniciar e instalar**. A consulta inicial ocorre em segundo plano; indisponibilidade de rede não bloqueia os estudos. Apenas versões estáveis superiores do canal `win-x64` são oferecidas, sem token ou login do usuário. O Velopack valida o pacote antes de habilitar a instalação. Baixar não instala automaticamente, inclusive ao reabrir o aplicativo.
+
+A correção **1.0.1** aumenta o prazo da consulta para dois minutos, permitindo a resposta do GitHub em redes lentas ou com proxy. A versão 1.0.0 pode cancelar essa consulta após 15 segundos; nesse caso, instale a versão corrigida pelo link da versão estável. Os dados são reutilizados. A release 1.0.0 permanece preservada.
 
 Ao confirmar a instalação, novas gravações são bloqueadas, operações anteriores terminam e a API de backup do SQLite cria uma cópia consistente em `%LOCALAPPDATA%\TrilhaEstudos\backups`. A cópia é validada antes do encerramento normal e da substituição dos binários. Uma falha mantém o aplicativo aberto. Guarde os backups conforme sua necessidade; não há exclusão automática deles.
 

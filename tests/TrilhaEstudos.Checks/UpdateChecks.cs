@@ -56,6 +56,17 @@ internal static class UpdateChecks
             Expect(vm.Status.Contains("conexão"), "Erro manual incompreensível.");
             Expect((await store.ReadAsync()).Sessions.Count == 1, "Falha de rede afetou os estudos.");
         });
+        await Test("consulta lenta permite continuar gravando estudos", async () =>
+        {
+            var store = await Store();
+            var vm = new UpdateViewModel(new FakeUpdater { Release = new(newer, "Correção"), SlowCheck = true }, store);
+            var checking = vm.CheckAsync(false);
+            Expect(vm.State == AppUpdateState.Checking, "Consulta não ficou em segundo plano.");
+            await store.SavePlanAsync(null, "Gravado durante a consulta", "", null, "");
+            Expect((await store.ReadAsync()).Plans.Count == 2, "Consulta bloqueou a persistência.");
+            await checking;
+            Expect(vm.State == AppUpdateState.Available, "Consulta com mais de 15 segundos foi interrompida.");
+        });
         await Test("cancelamento não habilita a instalação", async () =>
         {
             var store = await Store();
@@ -116,9 +127,14 @@ internal static class UpdateChecks
         public Exception? CheckFailure { get; init; }
         public Exception? DownloadFailure { get; init; }
         public bool CancelDownload { get; init; }
+        public bool SlowCheck { get; init; }
         public int ApplyCount { get; private set; }
-        public Task<AppRelease?> CheckAsync(CancellationToken token) => CheckFailure != null
-            ? Task.FromException<AppRelease?>(CheckFailure) : Task.FromResult(Release);
+        public async Task<AppRelease?> CheckAsync(CancellationToken token)
+        {
+            if (SlowCheck) await Task.Delay(TimeSpan.FromSeconds(16), token);
+            if (CheckFailure != null) throw CheckFailure;
+            return Release;
+        }
         public Task DownloadAsync(AppRelease release, IProgress<int> progress, CancellationToken token)
         {
             if (CancelDownload) throw new OperationCanceledException();
