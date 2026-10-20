@@ -255,6 +255,20 @@ public sealed class StudyStore
         return true;
     });
 
+    public Task SetDisciplinePreviouslyStudiedAsync(int disciplineId, bool value) => Mutate((c, tx, s) =>
+    {
+        var discipline = s.Disciplines.SingleOrDefault(d => d.Id == disciplineId)
+            ?? throw new InvalidOperationException("Selecione uma disciplina válida.");
+        var topics = s.Topics.Where(t => t.DisciplineId == disciplineId).ToArray();
+        if (topics.All(t => t.PreviouslyStudied == value && (!value || t.Status == TopicStatus.Completed))) return false;
+        Exec(c, tx, value
+            ? "UPDATE Topic SET PreviouslyStudied=1,Status=2 WHERE DisciplineId=$id"
+            : "UPDATE Topic SET PreviouslyStudied=0 WHERE DisciplineId=$id", ("$id", disciplineId));
+        Log(c, tx, discipline.PlanId, value ? $"Disciplina marcada como estudada anteriormente: {discipline.Name}"
+            : $"Marcação de estudo anterior removida da disciplina: {discipline.Name}");
+        return true;
+    });
+
     public Task<int> SaveSessionAsync(int? id, int topicId, SessionKind kind, DateOnly date, int minutes, string notes) => Mutate((c, tx, s) =>
     {
         notes = Notes(notes);

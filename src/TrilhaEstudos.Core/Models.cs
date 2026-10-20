@@ -67,6 +67,22 @@ public sealed class StudySnapshot
         return $"{plan.Name} › {discipline.Name} › {parent}{topic.Name}";
     }
     public bool IsGroup(Topic topic) => Topics.Any(t => t.ParentId == topic.Id);
+    public TopicStatus? DisciplineStatus(int id)
+    {
+        var leaves = Topics.Where(t => t.DisciplineId == id && !IsGroup(t)).ToArray();
+        if (leaves.Length == 0) return null;
+        if (leaves.All(t => t.Status == TopicStatus.Completed)) return TopicStatus.Completed;
+        return leaves.All(t => t.Status == TopicStatus.NotStarted) ? TopicStatus.NotStarted : TopicStatus.InProgress;
+    }
+    public string PreviousStudyLabel(Discipline discipline)
+    {
+        var leaves = Topics.Where(t => t.DisciplineId == discipline.Id && !IsGroup(t)).ToArray();
+        if (leaves.Length == 0) return "Sem conteúdo";
+        var marked = leaves.Count(t => t.PreviouslyStudied);
+        return marked == 0 ? "Estudo anterior: nenhum item marcado"
+            : marked == leaves.Length ? "Estudado anteriormente • Todos os itens"
+            : $"Estudo anterior: {marked} de {leaves.Length} itens";
+    }
     public string PreviousStudyLabel(Topic topic)
     {
         var children = Topics.Where(t => t.ParentId == topic.Id).ToArray();

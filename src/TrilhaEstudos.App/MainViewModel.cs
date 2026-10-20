@@ -14,12 +14,13 @@ public sealed class MainViewModel : Observable
     private DateOnly _lastDay = DateOnly.FromDateTime(DateTime.Now);
     private bool _refreshing;
     private bool _ready;
+    private readonly Dictionary<(EntityKind Kind, int Id), bool> _expansion = [];
     private readonly Func<string, bool> _confirmPreviousStudy;
     public MainViewModel(StudyStore store, IAppUpdater? updater = null, Func<string, bool>? confirmPreviousStudy = null)
     {
         _store = store;
         _confirmPreviousStudy = confirmPreviousStudy ?? (message => MessageBox.Show(Application.Current.MainWindow,
-            message, "Estudo anterior em grupo", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes);
+            message, "Estudo anterior", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes);
         Updates = new UpdateViewModel(updater ?? new UnavailableAppUpdater(), store, () => !IsBusy);
         ShowUpdatesCommand = Command(() => { PageIndex = 5; return Task.CompletedTask; });
         NewPlanCommand = Command(NewPlan);
@@ -89,7 +90,22 @@ public sealed class MainViewModel : Observable
     public ICommand ShowUpdatesCommand { get; }
     public string IntervalsText => string.Join(", ", _snapshot.Intervals) + " dias";
     private int _pageIndex;
-    public int PageIndex { get => _pageIndex; set { if (Set(ref _pageIndex, value)) Raise(nameof(PageTitle)); } }
+    public int PageIndex
+    {
+        get => _pageIndex;
+        set
+        {
+            if (!Set(ref _pageIndex, value)) return;
+            if (value == 1)
+            {
+                var planId = ContextPlanId;
+                foreach (var plan in _snapshot.Plans) SetExpansion(EntityKind.Plan, plan.Id, false);
+                if (_selectedNode is { Kind: not EntityKind.Plan })
+                    SelectedNode = Tree.FirstOrDefault(n => n.Id == planId);
+            }
+            Raise(nameof(PageTitle));
+        }
+    }
     public string PageTitle => PageIndex switch { 0 => "Seu estudo em perspectiva", 1 => "Editais e conteúdo", 2 => "Encontre o próximo assunto", 3 => "Histórico de estudo", 4 => "Revisões", _ => "Configurações" };
     public IReadOnlyList<Choice> PlanChoices { get; private set; } = [new(-1, "Todos os editais")];
     private Choice? _selectedPlan = new(-1, "Todos os editais");
@@ -148,6 +164,7 @@ public sealed class MainViewModel : Observable
     public IReadOnlyList<SessionRow> SelectionSessions { get; private set; } = [];
     public string SelectionHistoryHint => SelectionSessions.Count == 0 ? "Ainda não há sessões neste assunto." : "Últimas sessões do assunto e seus subassuntos. O histórico completo permite editar e excluir.";
     public bool HasSelectedTopic => CurrentTopic != null;
+    public bool HasPreviousStudyTarget => HasSelectedTopic || SelectedNode?.Kind == EntityKind.Discipline;
     public bool Empty => _snapshot.Plans.Count == 0;
     public bool NoTopics => _snapshot.Topics.Count == 0;
     public string ResultHint => $"{TopicRows.Count} resultado(s). Grupos são identificados; o percentual do painel conta somente itens finais.";
@@ -204,16 +221,30 @@ public sealed class MainViewModel : Observable
         Detail = $"{t.Status.Text()} • {t.Priority.Text()}" + (_snapshot.IsGroup(t) ? " • Grupo" : "")
             + (t.PreviouslyStudied || _snapshot.IsGroup(t) ? "\n" + _snapshot.PreviousStudyLabel(t) : ""),
         Children = _snapshot.Topics.Where(x => x.ParentId == t.Id).Select(TopicNode).ToList(),
+        IsExpanded = Expanded(EntityKind.Topic, t.Id),
         IsSelected = _selectedNode?.Kind == EntityKind.Topic && _selectedNode.Id == t.Id
     };
-    private bool DisciplineCompleted(int id)
+    private bool Expanded(EntityKind kind, int id) => _expansion.GetValueOrDefault((kind, id), kind != EntityKind.Plan);
+    private void SetExpansion(EntityKind kind, int id, bool value)
     {
-        var leaves = _snapshot.Topics.Where(t => t.DisciplineId == id && !_snapshot.IsGroup(t)).ToArray();
-        return leaves.Length > 0 && leaves.All(t => t.Status == TopicStatus.Completed);
+        _expansion[(kind, id)] = value;
+        var node = Flatten(Tree).FirstOrDefault(n => n.Kind == kind && n.Id == id);
+        if (node != null) node.IsExpanded = value;
+    }
+    private void RevealParents(int planId, int? disciplineId = null, int? parentTopicId = null)
+    {
+        SetExpansion(EntityKind.Plan, planId, true);
+        if (disciplineId is int discipline) SetExpansion(EntityKind.Discipline, discipline, true);
+        if (parentTopicId is int topic) SetExpansion(EntityKind.Topic, topic, true);
     }
     private void RefreshViews()
     {
         _refreshing = true;
+        foreach (var node in Flatten(Tree)) _expansion[(node.Kind, node.Id)] = node.IsExpanded;
+        var existing = _snapshot.Plans.Select(p => (EntityKind.Plan, p.Id))
+            .Concat(_snapshot.Disciplines.Select(d => (EntityKind.Discipline, d.Id)))
+            .Concat(_snapshot.Topics.Select(t => (EntityKind.Topic, t.Id))).ToHashSet();
+        foreach (var key in _expansion.Keys.Where(k => !existing.Contains(k)).ToArray()) _expansion.Remove(key);
         DisciplineChoices = new[] { new Choice(-1, "Todas as disciplinas") }.Concat(_snapshot.Disciplines
             .Where(d => PlanFilter == null || d.PlanId == PlanFilter).Select(d => new Choice(d.Id, d.Name))).ToArray();
         _selectedDiscipline = DisciplineChoices.FirstOrDefault(d => d.Id == _selectedDiscipline?.Id) ?? DisciplineChoices[0];
@@ -221,12 +252,14 @@ public sealed class MainViewModel : Observable
         Tree = _snapshot.Plans.Where(p => PlanFilter == null || p.Id == PlanFilter).Select(p => new ContentNode
         {
             Id = p.Id, Kind = EntityKind.Plan, Name = p.Name, Detail = "Edital / plano",
+            IsExpanded = Expanded(EntityKind.Plan, p.Id),
             IsSelected = _selectedNode?.Kind == EntityKind.Plan && _selectedNode.Id == p.Id,
             Children = _snapshot.Disciplines.Where(d => d.PlanId == p.Id).Select(d => new ContentNode
             {
                 Id = d.Id, Kind = EntityKind.Discipline, Name = d.Name,
-                Detail = DisciplineCompleted(d.Id) ? "Disciplina • Todos os itens concluídos" : "Disciplina",
-                Status = DisciplineCompleted(d.Id) ? TopicStatus.Completed : null,
+                Detail = $"Disciplina • {_snapshot.DisciplineStatus(d.Id)?.Text() ?? "Sem conteúdo"}\n{_snapshot.PreviousStudyLabel(d)}",
+                Status = _snapshot.DisciplineStatus(d.Id),
+                IsExpanded = Expanded(EntityKind.Discipline, d.Id),
                 IsSelected = _selectedNode?.Kind == EntityKind.Discipline && _selectedNode.Id == d.Id,
                 Children = _snapshot.Topics.Where(t => t.DisciplineId == d.Id && t.ParentId == null).Select(TopicNode).ToList()
             }).ToList()
@@ -280,7 +313,11 @@ public sealed class MainViewModel : Observable
         }
         else if (SelectedNode.Kind == EntityKind.Discipline)
         {
-            SelectionTitle = SelectedNode.Name; SelectionDetails = "Disciplina. Use “Novo assunto” para cadastrar seu conteúdo. Selecione um assunto para registrar sessões.";
+            var discipline = _snapshot.Disciplines.Single(d => d.Id == SelectedNode.Id);
+            SelectionTitle = discipline.Name;
+            SelectionDetails = $"Disciplina • {_snapshot.DisciplineStatus(discipline.Id)?.Text() ?? "Sem conteúdo"}\n"
+                + _snapshot.PreviousStudyLabel(discipline) + "\n\nUse “Marcar como já estudado” para concluir todos os assuntos e subassuntos existentes sem registrar tempo. "
+                + "Novos conteúdos começam sem marcação. Use “Novo assunto” para adicionar conteúdo e selecione um assunto para registrar sessões.";
         }
         else if (CurrentTopic is { } t)
         {
@@ -293,7 +330,7 @@ public sealed class MainViewModel : Observable
             var family = _snapshot.TopicFamily(t.Id).ToHashSet();
             SelectionSessions = _snapshot.Sessions.Where(s => family.Contains(s.TopicId)).Take(5).Select(SessionDisplay).ToArray();
         }
-        foreach (var property in new[] { nameof(SelectionTitle), nameof(SelectionDetails), nameof(SelectionSessions), nameof(SelectionHistoryHint), nameof(HasSelectedTopic) }) Raise(property);
+        foreach (var property in new[] { nameof(SelectionTitle), nameof(SelectionDetails), nameof(SelectionSessions), nameof(SelectionHistoryHint), nameof(HasSelectedTopic), nameof(HasPreviousStudyTarget) }) Raise(property);
         CommandManager.InvalidateRequerySuggested();
     }
     private async Task ShowEditor(string title, string hint, EditorViewModel draft, Func<EditorViewModel, Task> save)
@@ -321,6 +358,7 @@ public sealed class MainViewModel : Observable
         async v =>
         {
             var id = await _store.SaveDisciplineAsync(d?.Id, planId, v["name"].Text);
+            if (d == null) RevealParents(planId);
             _selectedNode = new ContentNode { Id = id, Kind = EntityKind.Discipline, Name = v["name"].Text };
         });
     private Task NewTopic(bool child) => TopicEditor(null, ContextDisciplineId!.Value, child ? CurrentTopic!.Id : null);
@@ -340,6 +378,7 @@ public sealed class MainViewModel : Observable
                 var id = await _store.SaveTopicAsync(t?.Id, disciplineId, parent, v["name"].Text,
                     (TopicStatus)(v["status"].Number ?? 0), (Priority)(v["priority"].Number ?? 1), v["notes"].Text,
                     applyGroupStatus: !isGroup || v["status"].Number != (int)t!.Status);
+                if (t == null) RevealParents(_snapshot.Disciplines.Single(d => d.Id == disciplineId).PlanId, disciplineId, parent);
                 _selectedNode = new ContentNode { Id = id, Kind = EntityKind.Topic, Name = v["name"].Text };
             });
     }
@@ -380,6 +419,8 @@ public sealed class MainViewModel : Observable
     };
     private IEnumerable<Topic> PreviousStudyFamily()
     {
+        if (PageIndex == 1 && SelectedNode?.Kind == EntityKind.Discipline)
+            return _snapshot.Topics.Where(t => t.DisciplineId == SelectedNode.Id);
         var id = PageIndex == 2 ? SelectedTopicRow?.Id : PageIndex == 1 ? CurrentTopic?.Id : null;
         return id == null ? [] : _snapshot.Topics.Where(t => t.Id == id || t.ParentId == id);
     }
@@ -387,6 +428,17 @@ public sealed class MainViewModel : Observable
     {
         var family = PreviousStudyFamily().ToArray();
         if (family.Length == 0) return;
+        if (PageIndex == 1 && SelectedNode?.Kind == EntityKind.Discipline)
+        {
+            var effect = value ? "Todo o conteúdo será concluído e marcado como estudado anteriormente."
+                : "A marcação histórica será removida de todo o conteúdo. Os status atuais serão mantidos.";
+            var roots = family.Count(t => t.ParentId == null);
+            var children = family.Length - roots;
+            if (!_confirmPreviousStudy($"{SelectedNode.Name}\n\nEsta ação inclui {roots} assunto(s) e {children} subassunto(s) existentes. {effect}\n\nNão cria sessões, não soma tempo e não altera revisões. Continuar?")) return;
+            await _store.SetDisciplinePreviouslyStudiedAsync(SelectedNode.Id, value);
+            await Reload();
+            return;
+        }
         var topic = family.Single(t => t.ParentId == null || family.All(p => p.Id != t.ParentId));
         var count = family.Length - 1;
         if (count > 0)
@@ -433,8 +485,10 @@ public sealed class MainViewModel : Observable
     {
         var id = PageIndex == 2 ? SelectedTopicRow!.Id : SelectedReview!.TopicId;
         var topic = _snapshot.Topics.Single(t => t.Id == id);
+        PageIndex = 1;
+        RevealParents(_snapshot.PlanIdOf(topic), topic.DisciplineId, topic.ParentId);
         _selectedNode = new ContentNode { Id = id, Kind = EntityKind.Topic, Name = topic.Name };
-        PageIndex = 1; RefreshViews(); return Task.CompletedTask;
+        RefreshViews(); return Task.CompletedTask;
     }
     private Task Settings() => ShowEditor("Intervalos de revisão",
         "Informe intervalos em dias separados por vírgula. Cada intervalo começa após a etapa anterior. A mudança afeta somente novos ciclos.",

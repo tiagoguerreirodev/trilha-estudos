@@ -7,7 +7,7 @@
  WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
  <Window.Resources>
   <Style x:Key="ContentTreeItem" TargetType="TreeViewItem">
-   <Setter Property="IsExpanded" Value="True" />
+   <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
    <Setter Property="Foreground" Value="#192F36" />
@@ -200,12 +200,12 @@
            <Button Content="Mover para cima" Command="{Binding MoveUpCommand}" />
            <Button Content="Mover para baixo" Command="{Binding MoveDownCommand}" />
           </WrapPanel>
-          <WrapPanel Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}">
+          <WrapPanel Visibility="{Binding HasPreviousStudyTarget, Converter={StaticResource BoolVisibility}}">
            <Button Content="Marcar como já estudado" Command="{Binding MarkPreviouslyStudiedCommand}" />
            <Button Content="Remover marcação de estudo anterior" Command="{Binding RemovePreviouslyStudiedCommand}" ToolTip="Remove somente a marcação. Para alterar o status, use Editar." />
           </WrapPanel>
           <TextBlock Text="Estudo anterior conclui o conteúdo sem registrar sessão ou tempo e sem iniciar revisões. Remover a marcação mantém o status atual."
-           Style="{StaticResource Hint}" Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}" />
+           Style="{StaticResource Hint}" Visibility="{Binding HasPreviousStudyTarget, Converter={StaticResource BoolVisibility}}" />
           <WrapPanel Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolVisibility}}">
            <Button Content="Registrar sessão" Command="{Binding NewSessionCommand}" Style="{StaticResource Primary}" />
            <Button Content="Iniciar novo ciclo" Command="{Binding RestartCycleCommand}" ToolTip="Disponível quando não há ciclo pendente. Inicia a partir de hoje." />

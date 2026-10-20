@@ -41,6 +41,8 @@ public sealed class ContentNode : Observable
     public string Detail { get; init; } = "";
     public Core.TopicStatus? Status { get; init; }
     public List<ContentNode> Children { get; init; } = [];
+    private bool _isExpanded;
+    public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
 }

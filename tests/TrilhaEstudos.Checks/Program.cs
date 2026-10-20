@@ -256,6 +256,8 @@ await Check("Atividades filtradas e resumo por edital", async store =>
     Expect(s.Activities.Where(a => a.PlanId == p).Take(10).Count() == 4, "Atividades por edital incorretas.");
 });
 
+try { passed += await DisciplineChecks.RunAsync(root); }
+catch (Exception ex) { failed++; Console.WriteLine($"ERRO Disciplina\n{ex}"); }
 try { passed += await PreviousStudyChecks.RunAsync(root); }
 catch (Exception ex) { failed++; Console.WriteLine($"ERRO Estudo anterior\n{ex}"); }
 try { passed += await UpdateChecks.RunAsync(root); }

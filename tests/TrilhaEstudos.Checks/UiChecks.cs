@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Windows.Input;
+using System.Text.Json;
 using TrilhaEstudos.App;
 using TrilhaEstudos.Core;
 
@@ -76,7 +77,7 @@ internal static class UiChecks
                     for (var page = 0; page < 6; page++)
                     {
                         vm.PageIndex = page;
-                        if (page == 1) vm.SelectedNode = vm.Tree[0].Children[0].Children[0];
+                        if (page == 1) vm.SelectedNode = vm.Tree[0];
                         await Render(window, Path.Combine(outputDirectory, $"0{page + 2}-tela-{page}.png"));
                     }
                     vm.PageIndex = 2; vm.Search = "ARGUMENTACAO";
@@ -86,6 +87,7 @@ internal static class UiChecks
                     vm.PageIndex = 1;
                     await Render(window, Path.Combine(outputDirectory, "09-conteudo-tamanho-minimo.png"));
                     await CheckTreeColors(window, vm, store, p, d, group, t, outputDirectory);
+                    await CheckDisciplineAndExpansion(window, vm, store, value => allowGroup = value, confirmations, outputDirectory);
                     var draft = new EditorViewModel().Text("name", "Nome do assunto *", "")
                         .Choice("status", "Status", [new(0, "Não iniciado"), new(1, "Em andamento"), new(2, "Concluído")], 0)
                         .Date("date", "Data (opcional)", today).Text("notes", "Observações (opcional)", "", true);
@@ -121,6 +123,8 @@ internal static class UiChecks
         {
             await vm.InitializeAsync(); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
             Require(vm.Error.Length == 0, vm.Error);
+            foreach (var planNode in vm.Tree) planNode.IsExpanded = true;
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
         }
         ContentNode Node(int id, EntityKind kind) => Descendants(window).OfType<Border>()
             .Where(b => b.Name == "StatusHeader").Select(b => b.DataContext).OfType<ContentNode>().First(n => n.Id == id && n.Kind == kind);
@@ -137,7 +141,7 @@ internal static class UiChecks
         var s = await store.ReadAsync(); var t = s.Topics.Single(x => x.Id == topic);
         await store.SaveTopicAsync(t.Id, t.DisciplineId, t.ParentId, t.Name, TopicStatus.InProgress, t.Priority, t.Notes); await Refresh();
         Require((await store.ReadAsync()).Topics.Single(x => x.Id == topic).PreviouslyStudied, "Histórico foi perdido ao reabrir assunto.");
-        ColorIs(topic, EntityKind.Topic, "#E8F0FE"); Neutral(discipline, EntityKind.Discipline);
+        ColorIs(topic, EntityKind.Topic, "#E8F0FE"); ColorIs(discipline, EntityKind.Discipline, "#E8F0FE");
         var added = await store.SaveTopicAsync(null, discipline, group,
             "Um subassunto com nome longo para conferir a quebra de linhas e a legibilidade do status na árvore em uma janela menor",
             TopicStatus.NotStarted, Priority.Medium, "Teste isolado da interface.");
@@ -177,13 +181,107 @@ internal static class UiChecks
         foreach (var key in new object[] { SystemParameters.HighContrastKey, SystemColors.WindowBrushKey, SystemColors.WindowTextBrushKey, SystemColors.HighlightBrushKey, SystemColors.HighlightTextBrushKey }) window.Resources.Remove(key);
         await Refresh(); ColorIs(topic, EntityKind.Topic, "#E8F0FE");
         await store.SaveTopicAsync(t.Id, t.DisciplineId, t.ParentId, t.Name, TopicStatus.Completed, t.Priority, t.Notes); await Refresh();
-        Neutral(discipline, EntityKind.Discipline);
+        ColorIs(discipline, EntityKind.Discipline, "#E8F0FE");
         await store.DeleteAsync(EntityKind.Topic, added); await Refresh();
         ColorIs(discipline, EntityKind.Discipline, "#E6F4EA");
         await store.SaveTopicAsync(null, discipline, null, "Nova pendência", TopicStatus.NotStarted, Priority.Low, ""); await Refresh();
-        Neutral(discipline, EntityKind.Discipline);
+        ColorIs(discipline, EntityKind.Discipline, "#E8F0FE");
         Require(vm.Summary.Minutes == 45 && vm.SessionRows.Count == 1 && vm.ReviewRows.Count == 1, "Mudança visual alterou estudos.");
     }
+    private static async Task CheckDisciplineAndExpansion(Window window, MainViewModel vm, StudyStore store,
+        Action<bool> allowConfirmation, List<string> confirmations, string output)
+    {
+        var p = await store.SavePlanAsync(null, "Plano de navegação", "Somente teste isolado", null, "");
+        var d = await store.SaveDisciplineAsync(null, p, "Disciplina de estudo anterior");
+        var group = await store.SaveTopicAsync(null, d, null, "Grupo de conteúdos", TopicStatus.NotStarted, Priority.Medium, "");
+        await store.SaveTopicAsync(null, d, group, "Primeiro conteúdo", TopicStatus.NotStarted, Priority.Low, "");
+        await store.SaveTopicAsync(null, d, group, "Segundo conteúdo", TopicStatus.InProgress, Priority.High, "");
+        await store.SaveTopicAsync(null, d, null, "Assunto independente", TopicStatus.Completed, Priority.Medium, "");
+        var pending = await store.SaveDisciplineAsync(null, p, "Disciplina não iniciada");
+        await store.SaveTopicAsync(null, pending, null, "Conteúdo pendente", TopicStatus.NotStarted, Priority.Medium, "");
+        var inProgress = await store.SaveDisciplineAsync(null, p, "Disciplina em andamento");
+        await store.SaveTopicAsync(null, inProgress, null, "Conteúdo em progresso", TopicStatus.InProgress, Priority.Medium, "");
+        var empty = await store.SaveDisciplineAsync(null, p, "Disciplina sem conteúdo");
+        await vm.InitializeAsync();
+        vm.PageIndex = 0; vm.PageIndex = 1;
+        async Task Layout() { await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout(); }
+        ContentNode Node(int id, EntityKind kind) => Walk(vm.Tree).Single(n => n.Kind == kind && n.Id == id);
+        TreeViewItem Item(int id, EntityKind kind) => Descendants(window).OfType<TreeViewItem>()
+            .Single(x => x.DataContext is ContentNode n && n.Kind == kind && n.Id == id);
+        Border Header(int id, EntityKind kind) => Descendants(window).OfType<Border>()
+            .Single(x => x.Name == "StatusHeader" && x.DataContext is ContentNode n && n.Kind == kind && n.Id == id);
+        void ColorIs(int id, string color) => Require(((SolidColorBrush)Header(id, EntityKind.Discipline).Background).Color
+            == (Color)ColorConverter.ConvertFromString(color), "Cor incorreta da disciplina.");
+        await Layout();
+        Require(vm.Tree.All(n => !n.IsExpanded) && vm.Tree.All(n => !Item(n.Id, EntityKind.Plan).IsExpanded), "Planos não iniciaram recolhidos.");
+        Require(vm.SelectedNode == null || vm.SelectedNode.Kind == EntityKind.Plan, "Seleção ficou escondida no plano recolhido.");
+        await Render(window, Path.Combine(output, "14-planos-recolhidos.png"));
+        Item(p, EntityKind.Plan).IsExpanded = true; await Layout();
+        Require(Node(p, EntityKind.Plan).IsExpanded, "Expansão visual não retornou ao modelo.");
+        ColorIs(pending, "#FCE8E6"); ColorIs(d, "#E8F0FE");
+        vm.SelectedNode = Node(empty, EntityKind.Discipline);
+        Require(vm.HasPreviousStudyTarget && !vm.HasSelectedTopic && !vm.MarkPreviouslyStudiedCommand.CanExecute(null)
+            && !vm.RemovePreviouslyStudiedCommand.CanExecute(null), "Ações habilitadas para disciplina vazia.");
+        vm.SelectedNode = Node(d, EntityKind.Discipline);
+        var before = await store.ReadAsync(); var serialized = JsonSerializer.Serialize(before);
+        allowConfirmation(false); var start = confirmations.Count;
+        await Execute(vm.MarkPreviouslyStudiedCommand, vm);
+        Require(confirmations.Count == start + 1 && confirmations[^1].Contains("2 assunto(s) e 2 subassunto(s)")
+            && JsonSerializer.Serialize(await store.ReadAsync()) == serialized, "Cancelar marcação da disciplina alterou dados ou omitiu quantidades.");
+        allowConfirmation(true); await Execute(vm.MarkPreviouslyStudiedCommand, vm); await Layout();
+        var marked = await store.ReadAsync();
+        Require(marked.Topics.Where(t => t.DisciplineId == d).All(t => t.PreviouslyStudied && t.Status == TopicStatus.Completed)
+            && marked.Activities.Count == before.Activities.Count + 1, "Marcação em lote ou atividade incorreta.");
+        Require(vm.SelectionDetails.Contains("Todos os itens") && vm.SelectedNode!.Detail.Contains("Estudado anteriormente")
+            && !vm.MarkPreviouslyStudiedCommand.CanExecute(null), "Detalhes ou comandos da disciplina desatualizados.");
+        Require(JsonSerializer.Serialize(marked.Sessions) == JsonSerializer.Serialize(before.Sessions)
+            && JsonSerializer.Serialize(marked.Cycles) == JsonSerializer.Serialize(before.Cycles) && vm.Summary.Minutes == before.Summary().Minutes,
+            "Marcação da disciplina alterou tempo ou revisões.");
+        ColorIs(d, "#E6F4EA");
+        window.Width = 1320; window.Height = 960;
+        await Render(window, Path.Combine(output, "15-disciplina-estudo-anterior.png"));
+        Require(Node(p, EntityKind.Plan).IsExpanded && vm.Tree.Where(n => n.Id != p).All(n => !n.IsExpanded), "Salvar mudou a expansão de planos.");
+        allowConfirmation(false); await Execute(vm.RemovePreviouslyStudiedCommand, vm);
+        Require(JsonSerializer.Serialize(await store.ReadAsync()) == JsonSerializer.Serialize(marked), "Cancelar remoção alterou dados.");
+        allowConfirmation(true); await Execute(vm.RemovePreviouslyStudiedCommand, vm); await Layout();
+        ColorIs(d, "#E6F4EA"); Require(vm.SelectionDetails.Contains("nenhum"), "Remoção não atualizou histórico.");
+        await Execute(vm.MarkPreviouslyStudiedCommand, vm);
+        Node(group, EntityKind.Topic).IsExpanded = false;
+        await vm.InitializeAsync(); await Layout();
+        Require(!Node(group, EntityKind.Topic).IsExpanded && Node(p, EntityKind.Plan).IsExpanded, "Atualização perdeu recolhimento manual.");
+        vm.SelectedNode = Node(group, EntityKind.Topic);
+        await Submit(vm.NewSubtopicCommand, vm, v => v["name"].Text = "Novo subassunto de verificação"); await Layout();
+        var added = vm.SelectedNode!.Id;
+        Require(Node(group, EntityKind.Topic).IsExpanded && Node(p, EntityKind.Plan).IsExpanded
+            && !((await store.ReadAsync()).Topics.Single(t => t.Id == added).PreviouslyStudied), "Cadastro não revelou o item ou herdou marcação.");
+        ColorIs(d, "#E8F0FE"); Require(Node(d, EntityKind.Discipline).Detail.Contains("3 de 4"), "Contagem parcial duplicou o grupo.");
+        vm.SelectedPlan = vm.PlanChoices.Single(x => x.Id == p);
+        vm.SelectedPlan = vm.PlanChoices[0]; await Layout();
+        Require(Node(p, EntityKind.Plan).IsExpanded, "Filtro perdeu a expansão.");
+        vm.PageIndex = 0; vm.PageIndex = 1; await Layout();
+        Require(vm.Tree.All(n => !n.IsExpanded) && vm.SelectedNode?.Kind == EntityKind.Plan, "Retorno à aba não recolheu os planos.");
+        vm.PageIndex = 2; vm.Search = "Novo subassunto de verificação"; vm.SelectedTopicRow = vm.TopicRows.Single();
+        await Execute(vm.OpenTopicCommand, vm); await Layout();
+        Require(vm.SelectedNode?.Id == added && Node(p, EntityKind.Plan).IsExpanded && Node(d, EntityKind.Discipline).IsExpanded
+            && Node(group, EntityKind.Topic).IsExpanded && vm.Tree.Where(n => n.Id != p).All(n => !n.IsExpanded), "Busca não revelou somente o caminho necessário.");
+        Item(group, EntityKind.Topic).Focus(); await Layout();
+        Require(Item(group, EntityKind.Topic).IsKeyboardFocused, "Foco de teclado não foi preservado.");
+        window.Width = 1320; window.Height = 960;
+        await Render(window, Path.Combine(output, "17-disciplina-marcacao-parcial.png"));
+        window.Width = 1024; window.Height = 720;
+        await Render(window, Path.Combine(output, "16-disciplina-tamanho-minimo.png"));
+        vm.PageIndex = 4; vm.SelectedReview = vm.ReviewRows.First();
+        await Execute(vm.OpenTopicCommand, vm); await Layout();
+        Require(vm.SelectedNode?.Kind == EntityKind.Topic && vm.Tree.Count(n => n.IsExpanded) == 1, "Navegação de revisão não revelou o assunto.");
+        vm.PageIndex = 0; vm.PageIndex = 1; await Layout();
+        Require(vm.Tree.All(n => !n.IsExpanded), "Planos abriram novamente sem ação do usuário.");
+        var disposable = await store.SavePlanAsync(null, "Plano temporário", "", null, "");
+        await vm.InitializeAsync(); Node(disposable, EntityKind.Plan).IsExpanded = true;
+        await store.DeleteAsync(EntityKind.Plan, disposable); await vm.InitializeAsync();
+        await Submit(vm.NewPlanCommand, vm, v => v["name"].Text = "Novo plano recolhido");
+        Require(vm.SelectedNode!.Id == disposable && !vm.SelectedNode.IsExpanded, "Novo plano herdou expansão de um identificador removido.");
+    }
+    private static IEnumerable<ContentNode> Walk(IEnumerable<ContentNode> nodes) => nodes.SelectMany(n => new[] { n }.Concat(Walk(n.Children)));
     private static async Task Execute(ICommand command, MainViewModel vm)
     {
         Require(command.CanExecute(null), $"Comando de estudo anterior desabilitado: página={vm.PageIndex}, seleção={vm.SelectedNode?.Kind}/{vm.SelectedNode?.Id}, ocupado={vm.IsBusy}, erro={vm.Error}."); command.Execute(null);
